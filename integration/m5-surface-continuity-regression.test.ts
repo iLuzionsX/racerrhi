@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { PhysicsMath } from '../.vendor/Racing26/src/physics/math/PhysicsMath';
+import { Simulation } from '../.vendor/Racing26/src/physics/Simulation';
+import { DEFAULT_VEHICLE_CONFIG } from '../.vendor/Racing26/src/physics/vehiclePresets';
+import { BMW_M5_2025_OVERRIDES } from '../.vendor/Racing26/src/physics/m5G90';
 import { racerrhiSurfaceMaterialForDistance } from './m5-surface-adapter';
 
 const points = [
@@ -151,5 +154,110 @@ console.log(JSON.stringify({
   newKerbToGravelFrictionStepAt8_25:Math.abs(muAfter-muBefore),
   maxMuStepPerCm:maxMuStep,
   maxRollingResistanceStepPerCm:maxRrStep,
+  status:'passed'
+},null,2));
+
+
+const m5Cfg:any={...DEFAULT_VEHICLE_CONFIG,...BMW_M5_2025_OVERRIDES};
+const neutral={throttle:0,brake:0,steer:0,handbrake:false,shiftUp:false,shiftDown:false};
+
+function legacyMaterial(distance:number){
+  const d=Math.max(0,distance);
+  const onRoad=d<=7.7;
+  const onKerb=d>7.0&&d<=8.25;
+  return {
+    type:onKerb?'kerb':onRoad?'asphalt':'gravel',
+    friction:onKerb?.88:onRoad?1:.55,
+    rollingResistance:onRoad?.015:.075,
+    isKerbRumble:onKerb,
+  };
+}
+
+function makeEdgeProvider(smooth:boolean){
+  return {
+    sampleSurface(x:number,_z:number){
+      const material=smooth
+        ? racerrhiSurfaceMaterialForDistance(Math.abs(x))
+        : legacyMaterial(Math.abs(x));
+      return {
+        elevation:0,
+        normal:PhysicsMath.vec3(0,1,0),
+        slopePitch:0,
+        slopeRoll:0,
+        type:material.type,
+        friction:material.friction,
+        rollingResistance:material.rollingResistance,
+        wetness:0,
+        isKerbRumble:material.isKerbRumble,
+      };
+    }
+  };
+}
+
+function runEdgeCrossing(smooth:boolean){
+  const sim=new Simulation(m5Cfg,makeEdgeProvider(smooth) as any);
+  sim.reset(7.10,0,0);
+  sim.vehicle.powertrain.isAutomatic=false;
+  (sim.vehicle.powertrain as any).gear=0;
+  for(let i=0;i<240;i++)sim.stepExplicit(neutral,1);
+
+  const speed=80/3.6;
+  sim.vehicle.rigidBody.velocity=PhysicsMath.vec3(.85,0,speed);
+  sim.vehicle.wheels.forEach((wheel:any)=>wheel.reset(speed));
+  for(let i=0;i<30;i++)sim.stepExplicit(neutral,1);
+
+  let previousWheelFy:number[]|null=null;
+  let previousYawRate:number|null=null;
+  let maxWheelForceStepN=0;
+  let maxYawRateStepDegS=0;
+  let peakYawDegS=0;
+  let peakSlipDeg=0;
+  const surfaceTransitions=new Set<string>();
+
+  for(let i=0;i<180;i++){
+    const state=sim.stepExplicit(neutral,1);
+    const wheelFy=state.wheels.map((w:any)=>w.forceVectorLat);
+    if(previousWheelFy){
+      for(let k=0;k<4;k++){
+        maxWheelForceStepN=Math.max(maxWheelForceStepN,Math.abs(wheelFy[k]-previousWheelFy[k]));
+      }
+    }
+    if(previousYawRate!==null){
+      maxYawRateStepDegS=Math.max(maxYawRateStepDegS,Math.abs(state.yawRate-previousYawRate)*180/Math.PI);
+    }
+    peakYawDegS=Math.max(peakYawDegS,Math.abs(state.yawRate)*180/Math.PI);
+    peakSlipDeg=Math.max(peakSlipDeg,...state.wheels.map((w:any)=>Math.abs(w.slipAngle)*180/Math.PI));
+    surfaceTransitions.add(state.wheels.map((w:any)=>w.surfaceType).join(','));
+    previousWheelFy=wheelFy;
+    previousYawRate=state.yawRate;
+  }
+  return {
+    maxWheelForceStepN,
+    maxYawRateStepDegS,
+    peakYawDegS,
+    peakSlipDeg,
+    surfaceStates:[...surfaceTransitions],
+  };
+}
+
+const legacyEdge=runEdgeCrossing(false);
+const smoothEdge=runEdgeCrossing(true);
+
+if(!(smoothEdge.maxWheelForceStepN<legacyEdge.maxWheelForceStepN)){
+  throw new Error('finite contact patch did not reduce per-step wheel force jump');
+}
+if(!(smoothEdge.maxYawRateStepDegS<legacyEdge.maxYawRateStepDegS*1.05)){
+  throw new Error('finite contact patch worsened yaw impulse across material edge');
+}
+console.log(JSON.stringify({
+  scenario:'Full M5 kerb-to-gravel edge crossing A/B',
+  speedKmh:80,
+  lateralVelocityMps:.85,
+  legacyEdge,
+  smoothEdge,
+  improvement:{
+    wheelForceStepRatio:smoothEdge.maxWheelForceStepN/legacyEdge.maxWheelForceStepN,
+    yawRateStepRatio:smoothEdge.maxYawRateStepDegS/legacyEdge.maxYawRateStepDegS,
+  },
   status:'passed'
 },null,2));
