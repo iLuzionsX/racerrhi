@@ -3,7 +3,7 @@ Tu
 
 # APEX / Côte d’Azur
 
-A self-contained Three.js coastal time-attack game created with Astra. A downloaded Ferrari 458 Italia runs on an original closed circuit at sunset.
+A self-contained Three.js coastal time-attack game created with Astra. A 2025 BMW M5 G90 runs on an original closed circuit at sunset, powered by the same deterministic Racing26 M5 simulation used in `iLuzionsX/Racing26`.
 
 ## Play
 
@@ -22,11 +22,11 @@ Upload this repository to a new GitHub repository with default branch `main`. In
 
 ## Verification
 
-`node test.mjs` covers acceleration, braking, full-lock high-speed stability, smooth steering reversal, ordered lap completion, start-line shortcuts, and invalid off-track laps. JavaScript syntax and local dependency references were checked. Browser rendering, phone usability, and real-device frame rate have not been verified in this run. Driving is a simplified, fixed-120-Hz model with bounded cornering acceleration, not a physically validated Ferrari simulation. Cosmetic body motion remains attached to one authoritative vehicle transform.
+`node test.mjs` covers acceleration, braking, full-lock high-speed stability, smooth steering reversal, ordered lap completion, start-line shortcuts, and invalid off-track laps. JavaScript syntax and local dependency references were checked. Browser rendering, phone usability, and real-device frame rate have not been verified in this run. Driving is supplied by the pinned Racing26 M5 physics stack: deterministic 120 Hz rigid-body simulation, four-wheel transient tire forces, suspension/load transfer, M xDrive differential logic, powertrain, ABS/TCS, and M5 mass/geometry calibration. `integration/m5-bridge.ts` adapts that engine to the Riviera track surface and game HUD.
 
 ## Credits
 
-- Ferrari 458 Italia model: **vicent091036**, https://sketchfab.com/models/57bf6cc56931426e87494f554df1dab6 ; sourced from https://github.com/mrdoob/three.js/blob/dev/examples/models/gltf/ferrari.glb and credited by https://threejs.org/examples/webgl_materials_car.html . Materials modified to pale lime paint and dark rims. The original model page could not be retrieved during this run; its model-specific license terms have not been independently confirmed. Verify those terms before a wider public redistribution. Ferrari names/marks belong to their owners; no affiliation is claimed.
+- BMW M5 G90 exterior runtime and M5 physics donor: `iLuzionsX/Racing26`, pinned by the Pages build to commit `e330cf5edb2c77b40267dd17d12e09858e3602a1`. BMW names/marks belong to their owners; no affiliation is claimed.
 - Three.js 0.180.0: MIT, included in `dist/assets/THREE-LICENSE.txt`.
 - Poly Haven CC0: Asphalt 02, Leafy Grass, Rock Boulder Cracked PBR maps and Grasslands Sunset HDR, downloaded at 1K. `download-assets.mjs` records reproducible source downloads. See https://polyhaven.com/license .
 - Mediterranean stone-pine cutout generated for this project; crossed instanced foliage replaces the original cone trees. Detailed rock geometry, continuous safety fencing, tire barriers and pit lighting supplement the textured terrain.
