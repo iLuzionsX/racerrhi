@@ -67,6 +67,34 @@ function runFirstTurn(speedKmh:number,handWheelDeg:number,throttle:number){
  return{speedKmh,handWheelDeg,raw,initialTarget,peakRearSlipDeg:peakRearSlip,peakFrontSlipDeg:peakFrontSlip,peakYawDegS:peakYaw,peakKappa,minWheelFzN:minFz,finalSpeedKmh:state.speedKmh};
 }
 
+
+
+function runLegacyDirectMapping(speedKmh:number,handWheelDeg:number,throttle:number){
+ const sim=launchedM5(speedKmh);
+ const raw=-Math.min(1,Math.abs(handWheelDeg)/135);
+ let peakRearSlip=0,peakFrontSlip=0,peakYaw=0,peakKappa=0,minFz=Infinity;
+ for(let i=0;i<180;i++){
+   const ramp=Math.min(1,(i+1)/60);
+   // Legacy Racerrhi bridge behavior: normalized +/-135 deg hand wheel was passed
+   // straight through as normalized M5 rack travel.
+   const target=-raw*ramp;
+   const state=sim.stepExplicit({...neutral,steer:0,analogSteerTarget:target,throttle} as any,1);
+   peakRearSlip=Math.max(peakRearSlip,Math.max(Math.abs(state.wheels[2].slipAngle),Math.abs(state.wheels[3].slipAngle))*180/Math.PI);
+   peakFrontSlip=Math.max(peakFrontSlip,Math.max(Math.abs(state.wheels[0].slipAngle),Math.abs(state.wheels[1].slipAngle))*180/Math.PI);
+   peakYaw=Math.max(peakYaw,Math.abs(state.yawRate)*180/Math.PI);
+   peakKappa=Math.max(peakKappa,...state.wheels.map((w:any)=>Math.abs(w.slipRatio)));
+   minFz=Math.min(minFz,...state.wheels.map((w:any)=>w.forceVectorNorm));
+ }
+ return{speedKmh,handWheelDeg,legacyTarget:Math.abs(raw),peakRearSlipDeg:peakRearSlip,peakFrontSlipDeg:peakFrontSlip,peakYawDegS:peakYaw,peakKappa,minWheelFzN:minFz};
+}
+
+const legacyCases=[
+ runLegacyDirectMapping(100,90,.7),
+ runLegacyDirectMapping(100,135,.7),
+ runLegacyDirectMapping(120,90,.7),
+ runLegacyDirectMapping(120,135,.7),
+];
+
 const cases=[] as ReturnType<typeof runFirstTurn>[];
 for(const speed of [80,100,120])for(const hand of [45,60,90,135])cases.push(runFirstTurn(speed,hand,.7));
 
@@ -104,6 +132,7 @@ console.log(JSON.stringify({
  roadSpeedFullRackRequest:roadSpeedTarget,
  lowSpeedFullRackRequest:lowSpeedTarget,
  severeRecoveryRackRequest:recoveryTarget,
+ legacyDirectMappingCases:legacyCases,
  cases,
  status:'passed'
 },null,2));
