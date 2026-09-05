@@ -106,6 +106,16 @@ for(const c of cases){
  assert(c.minWheelFzN>500,'first-turn unloaded a wheel excessively: '+JSON.stringify(c));
 }
 
+// Prove the actual old failure mode: the legacy direct mapping drove the front
+// tires deep into saturation at the same first-turn speed and hand-wheel travel.
+for(const speed of [100,120]){
+ const legacyFull=legacyCases.find(c=>c.speedKmh===speed&&c.handWheelDeg===135)!;
+ const fixedFull=cases.find(c=>c.speedKmh===speed&&c.handWheelDeg===135)!;
+ assert(legacyFull.peakFrontSlipDeg>25,'legacy baseline no longer reproduces first-turn front saturation');
+ assert(fixedFull.peakFrontSlipDeg<legacyFull.peakFrontSlipDeg*.45,'fixed mapping did not materially reduce first-turn front slip');
+ assert(fixedFull.peakKappa<legacyFull.peakKappa*.50,'fixed mapping did not materially reduce first-turn combined-slip saturation');
+}
+
 // At road speed, Racerrhi full wheel travel must no longer equal full M5 rack.
 const roadSpeedFull=launchedM5(100);
 const roadSpeedTarget=Math.abs(racerrhiSteeringTargetForM5(roadSpeedFull,-1));
