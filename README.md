@@ -11,9 +11,9 @@ Serve `dist` over HTTP: `python3 -m http.server 8080 --directory dist`. Open htt
 
 - WASD or arrows: steer, accelerate, brake; holding brake while stopped reverses.
 - Space: brake. C: camera. R: reset. Escape: pause.
-- Touch buttons appear on phones/tablets. Sound is opt-in.
-- Take the wheel starts a timed lap. Leaving the circuit invalidates the lap. Reset to retry. Ordered sectors prevent shortcut lap times.
-- Watch the lap uses a scripted circuit tour with three changing cinema views. It is a recording aid, not an AI driving demonstration. Use your device's screen recorder.
+- Analog touch steering wheel and independent throttle/brake pedals. Settings supports resizing, positioning with sliders or dragging, sensitivity, and persistent device layouts. Sound is opt-in.
+- Start Session begins a countdown for Time Attack or Free Practice. Leaving the circuit invalidates the lap; crossing the start line begins a fresh attempt. Ordered sectors prevent shortcut lap times.
+- C cycles chase, bonnet and cinematic cameras. Pause offers restart, settings and quit to menu.
 - Best valid lap is saved only on the current browser/device.
 
 ## GitHub Pages
@@ -28,6 +28,8 @@ Upload this repository to a new GitHub repository with default branch `main`. In
 
 - Ferrari 458 Italia model: **vicent091036**, https://sketchfab.com/models/57bf6cc56931426e87494f554df1dab6 ; sourced from https://github.com/mrdoob/three.js/blob/dev/examples/models/gltf/ferrari.glb and credited by https://threejs.org/examples/webgl_materials_car.html . Materials modified to pale lime paint and dark rims. The original model page could not be retrieved during this run; its model-specific license terms have not been independently confirmed. Verify those terms before a wider public redistribution. Ferrari names/marks belong to their owners; no affiliation is claimed.
 - Three.js 0.180.0: MIT, included in `dist/assets/THREE-LICENSE.txt`.
+- Poly Haven CC0: Asphalt 02, Leafy Grass, Rock Boulder Cracked PBR maps and Grasslands Sunset HDR, downloaded at 1K. `download-assets.mjs` records reproducible source downloads. See https://polyhaven.com/license .
+- Mediterranean stone-pine cutout generated for this project; crossed instanced foliage replaces the original cone trees. Detailed rock geometry, continuous safety fencing, tire barriers and pit lighting supplement the textured terrain.
 - Google Draco: Apache 2.0, included in `dist/assets/DRACO-LICENSE.txt`.
 - Barlow Condensed and Manrope fonts: SIL Open Font License, included in assets.
 - Original circuit, scene geometry, procedural materials, UI, synthesized audio, and driving code: created for this project.

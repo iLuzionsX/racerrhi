@@ -11,7 +11,8 @@ export function stepCar(s,input,dt,road){
  acceleration-=Math.sign(v)*(.12+.0028*v*v+(off?Math.abs(v)*.20:0));
  s.speed=clamp(v+acceleration*dt,-7,82);
  if(!input.throttle&&!input.brake&&Math.abs(s.speed)<.04)s.speed=0;
- const requested=s.speed/2.65*Math.tan(s.steer);
+ // Clockwise wheel input turns right in the chase camera (forward is +Z).
+ const requested=-s.speed/2.65*Math.tan(s.steer);
  const available=grip*Math.sqrt(Math.max(.35,1-Math.pow(Math.min(1,input.brake*.75),2)));
  const yawLimit=available/Math.max(3,Math.abs(s.speed));
  const targetYaw=yawLimit*Math.tanh(requested/yawLimit);
@@ -32,6 +33,6 @@ export function advanceLap(lap,t,onTrack,dt){
  const sector=Math.floor(t*4);
  if(sector===lap.next&&onTrack)lap.next++;
  let finish=null;
- if(lap.previous>.90&&t<.10&&lap.next===4){if(lap.valid)finish=lap.elapsed;lap.elapsed=0;lap.next=1;lap.valid=true;lap.count++;}
+ if(lap.previous>.90&&t<.10){if(lap.valid&&lap.next===4)finish=lap.elapsed;lap.elapsed=0;lap.next=1;lap.valid=true;lap.count++;}
  lap.previous=t;return finish;
 }

@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check dist/game.js && node test.mjs
+      - run: node --check dist/game.js && node --check dist/ui.js && node --check dist/visuals.js && node test.mjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
