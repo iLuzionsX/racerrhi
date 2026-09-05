@@ -4,6 +4,7 @@ import { DEFAULT_VEHICLE_CONFIG } from '../.vendor/Racing26/src/physics/vehicleP
 import { BMW_M5_2025_OVERRIDES } from '../.vendor/Racing26/src/physics/m5G90';
 import { loadBundledM5Visual } from '../.vendor/Racing26/src/graphics/bundledM5Visual';
 import { racerrhiSteeringTargetForM5 } from './m5-steering-adapter';
+import { racerrhiSurfaceMaterialForDistance } from './m5-surface-adapter';
 
 export const M5_PHYSICS_SOURCE = Object.freeze({
   repository: 'iLuzionsX/Racing26',
@@ -49,8 +50,7 @@ function surfaceFromRoad(x: number, z: number) {
   nz /= normalLength;
 
   const distance = Number(road.distance) || 0;
-  const onRoad = distance <= 7.7;
-  const onKerb = distance > 7.0 && distance <= 8.25;
+  const material = racerrhiSurfaceMaterialForDistance(distance);
   const elevation = Number(road.p?.y) || 0;
 
   return {
@@ -58,11 +58,11 @@ function surfaceFromRoad(x: number, z: number) {
     normal: PhysicsMath.vec3(nx, ny, nz),
     slopePitch: Math.atan2(dy, Math.sqrt(horizontalSq)),
     slopeRoll: 0,
-    type: onKerb ? 'kerb' : onRoad ? 'asphalt' : 'gravel',
-    friction: onKerb ? 0.88 : onRoad ? 1.0 : 0.55,
-    rollingResistance: onRoad ? 0.015 : 0.075,
+    type: material.type,
+    friction: material.friction,
+    rollingResistance: material.rollingResistance,
     wetness: 0,
-    isKerbRumble: onKerb,
+    isKerbRumble: material.isKerbRumble,
   };
 }
 

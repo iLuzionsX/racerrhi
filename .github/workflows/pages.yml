@@ -37,6 +37,8 @@ jobs:
         run: npx --yes tsx@4.20.6 integration/m5-racerrhi-recovery.test.ts
       - name: Validate Racerrhi first-turn steering
         run: npx --yes tsx@4.20.6 integration/m5-first-turn-regression.test.ts
+      - name: Validate Racerrhi surface continuity
+        run: npx --yes tsx@4.20.6 integration/m5-surface-continuity-regression.test.ts
       - name: Validate game
         run: |
           if [ -f dist/m5-runtime.js ]; then node --check dist/m5-runtime.js; fi

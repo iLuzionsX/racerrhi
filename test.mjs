@@ -34,6 +34,8 @@ assert(gameSource.includes('car.add(steerPivot)'));assert(!gameSource.includes('
 const indexSource=fs.readFileSync(new URL('./dist/index.html',import.meta.url),'utf8');
 const uiSource=fs.readFileSync(new URL('./dist/ui.js',import.meta.url),'utf8');
 assert(gameSource.includes('w.rotation.y=steer;'));assert(!gameSource.includes('w.rotation.y=-steer;'));console.log('PASS M5 render steering sign matches vehicle turn direction');
-assert(indexSource.includes('maximum-scale=1,user-scalable=no'));assert(indexSource.includes('./ui.js?v=4')&&indexSource.includes('./game.js?v=4'));assert(uiSource.includes("document.addEventListener('touchend'")&&uiSource.includes("{passive:false}"));console.log('PASS Mobile Safari double-tap zoom suppression and cache-busted controls');
+assert(indexSource.includes('maximum-scale=1,user-scalable=no'));assert(indexSource.includes('./ui.js?v=4')&&indexSource.includes('./game.js?v=5'));assert(uiSource.includes("document.addEventListener('touchend'")&&uiSource.includes("{passive:false}"));console.log('PASS Mobile Safari double-tap zoom suppression and cache-busted controls');
 
-assert(uiSource.includes("'gesturestart','gesturechange','gestureend'"));assert(uiSource.includes("e.touches.length>1")&&uiSource.includes("document.addEventListener('touchmove'"));assert(indexSource.includes('./ui.js?v=4')&&indexSource.includes('./game.js?v=4'));assert(gameSource.includes("./ui.js?v=4"));console.log('PASS Mobile Safari pinch zoom suppression and synchronized v4 module cache bust');
+assert(uiSource.includes("'gesturestart','gesturechange','gestureend'"));assert(uiSource.includes("e.touches.length>1")&&uiSource.includes("document.addEventListener('touchmove'"));assert(indexSource.includes('./ui.js?v=4')&&indexSource.includes('./game.js?v=5'));assert(gameSource.includes("./ui.js?v=4"));console.log('PASS Mobile Safari pinch zoom suppression and synchronized v4 module cache bust');
+
+assert(gameSource.includes("d=a.d.clone().lerp(b.d,u).normalize()"));assert(gameSource.includes("n=a.n.clone().lerp(b.n,u).normalize()"));console.log('PASS Racerrhi road tangent/normal interpolation for M5 suspension continuity');
