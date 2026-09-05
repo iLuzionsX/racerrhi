@@ -3,7 +3,7 @@ import { Simulation } from '../.vendor/Racing26/src/physics/Simulation';
 import { PhysicsMath } from '../.vendor/Racing26/src/physics/math/PhysicsMath';
 import { DEFAULT_VEHICLE_CONFIG } from '../.vendor/Racing26/src/physics/vehiclePresets';
 import { BMW_M5_2025_OVERRIDES } from '../.vendor/Racing26/src/physics/m5G90';
-import { racerrhiSteeringTargetForM5 } from './m5-bridge';
+import { racerrhiSteeringTargetForM5 } from './m5-steering-adapter';
 
 const cfg:any={...DEFAULT_VEHICLE_CONFIG,...BMW_M5_2025_OVERRIDES};
 const neutral={throttle:0,brake:0,steer:0,handbrake:false,shiftUp:false,shiftDown:false};
