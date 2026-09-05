@@ -15,7 +15,7 @@ console.log('PASS Racing26 M5 donor identity',meta.massKg.toFixed(1),'kg',meta.d
 
 const road={distance:0};let s=newCar(0,0,0);
 for(let i=0;i<1200;i++)stepCar(s,{throttle:1,brake:0,steer:0},1/120,road);
-assert(s.speed>40&&s.speed<80);assert(Math.abs(s.x)<.25);assert(Object.values(s).every(Number.isFinite));console.log('PASS M5 acceleration and straight-line stability',s.speed.toFixed(2),'m/s');
+assert(s.speed>40&&s.speed<80);assert(Math.abs(s.x)<.25);assert(Object.values(s).filter(v=>typeof v==='number').every(Number.isFinite));assert.equal(s.wheels.length,4);console.log('PASS M5 acceleration and straight-line stability',s.speed.toFixed(2),'m/s');
 for(let i=0;i<720;i++)stepCar(s,{throttle:0,brake:1,steer:0},1/120,road);
 assert(Math.abs(s.speed)<5);console.log('PASS M5 sustained braking');
 
