@@ -1,7 +1,7 @@
 import * as T from 'three';
 import {clamp} from './controls.mjs';
 import {stepCar,newCar,advanceLap,setSurfaceSampler,setCarPose,loadM5Visual} from './physics.mjs';
-import {config,input as touchInput,clearInput,sessionVisible} from './ui.js?v=3';
+import {config,input as touchInput,clearInput,sessionVisible} from './ui.js?v=4';
 import {surfaces,foliage,furniture} from './visuals.js';
 const $=id=>document.getElementById(id),TAU=Math.PI*2,wrapAngle=a=>Math.atan2(Math.sin(a),Math.cos(a));
 let renderer;try{renderer=new T.WebGLRenderer({canvas:$('world'),antialias:true,powerPreference:'high-performance'});}catch(e){$('loadtext').textContent='This drive needs WebGL 2. Try a current browser with hardware acceleration enabled.';throw e;}
