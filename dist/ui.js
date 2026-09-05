@@ -36,3 +36,8 @@ addEventListener('resize',()=>{clearInput();layout();});addEventListener('blur',
 // fast steering/pedal taps remain game input instead of viewport zoom.
 let lastTouchEnd=0;
 document.addEventListener('touchend',e=>{const now=performance.now();if(now-lastTouchEnd<350)e.preventDefault();lastTouchEnd=now;},{passive:false});
+
+// Block Safari pinch-to-zoom without interfering with normal one-finger controls.
+const preventGestureZoom=e=>e.preventDefault();
+for(const type of ['gesturestart','gesturechange','gestureend'])document.addEventListener(type,preventGestureZoom,{passive:false});
+document.addEventListener('touchmove',e=>{if(e.touches.length>1)e.preventDefault();},{passive:false});
