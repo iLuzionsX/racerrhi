@@ -21,7 +21,7 @@ assert(Math.abs(s.speed)<5);console.log('PASS M5 sustained braking');
 
 s=newCar(0,0,0);setCarPose(s,0,0,0,25);const startHeading=s.heading;
 for(let i=0;i<240;i++)stepCar(s,{throttle:.1,brake:0,steer:.45},1/120,road);
-assert(Object.values(s).every(Number.isFinite));assert(Math.abs(s.heading-startHeading)>.02);assert(Math.abs(s.roll)<1.25);console.log('PASS M5 steering produces bounded chassis response');
+assert(Object.values(s).filter(v=>typeof v==='number').every(Number.isFinite));assert.equal(s.wheels.length,4);assert(s.wheels.slice(0,2).every(w=>Number.isFinite(w.steerAngle)&&Number.isFinite(w.rotationAngle)));assert(Math.abs(s.wheels[0].steerAngle)>.01&&Math.abs(s.wheels[1].steerAngle)>.01);assert(Math.abs(s.heading-startHeading)>.02);assert(Math.abs(s.roll)<1.25);console.log('PASS M5 steering produces bounded chassis response with per-wheel telemetry');
 
 const lap=()=>({elapsed:0,next:1,previous:0,valid:true,count:1});let l=lap();for(const t of [.05,.26,.51,.76,.95])advanceLap(l,t,true,10);assert.equal(advanceLap(l,.01,true,1),51);console.log('PASS ordered sectors complete lap');
 l=lap();advanceLap(l,.95,true,1);assert.equal(advanceLap(l,.01,true,1),null);console.log('PASS start-line shortcut rejected');
