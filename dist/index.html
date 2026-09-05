@@ -1,10 +1,185 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101512"><meta name="description" content="APEX: a cinematic coastal time attack. Drive the Côte d’Azur in a Ferrari 458 Italia."><title>APEX — Côte d’Azur</title><link rel="icon" href="data:,"><link rel="stylesheet" href="./style.css"><script type="importmap">{"imports":{"three":"./assets/three.module.js"}}</script></head><body>
-<canvas id="world" aria-label="Three dimensional coastal racing circuit"></canvas><div class="vignette"></div>
-<header><div class="brand">APEX<span>DRIVING EXPERIENCES</span></div><div class="location">FRANCE <span>43°43′ N / 7°25′ E</span></div><button id="sound" class="icon" aria-label="Enable engine sound">SOUND OFF</button></header>
-<div id="loading"><span class="eyebrow">PREPARING YOUR DRIVE</span><h2>Almost on the grid.</h2><div class="loadtrack"><i id="loadbar"></i></div><p id="loadtext">Building the Côte d’Azur…</p></div>
-<main id="intro" hidden><div class="eyebrow"><b>01</b> THE COASTAL COLLECTION</div><h1>Côte<br>d’Azur<span>.</span></h1><p class="description">The coast is yours.<br>Find the limit.</p><div class="specs"><div><b>458</b><span>ITALIA</span></div><div><b id="length">2.1</b><span>KM CIRCUIT</span></div><div><b>18:42</b><span>GOLDEN HOUR</span></div></div><div class="actions"><button id="drive" class="primary">TAKE THE WHEEL <span>↗</span></button><button id="showcase" class="secondary">WATCH THE LAP</button></div><p class="instructions">WASD / ARROWS TO DRIVE <span>TOUCH CONTROLS ON MOBILE</span></p></main>
-<div id="hud" hidden><div class="timing"><span class="eyebrow" id="mode">TIME ATTACK</span><div id="timer">00:00.000</div><div class="best">BEST <b id="best">—</b><span id="lap">LAP 01</span></div></div><div class="speedo"><div class="gear"><span>GEAR</span><b id="gear">N</b></div><div><strong id="speed">0</strong><span class="unit">KM/H</span></div><div class="rpm"><i id="rpm"></i></div><span id="surface">PIT STRAIGHT</span></div><div class="map"><canvas id="map" width="220" height="180"></canvas><span>CÔTE D’AZUR / GP</span></div><div class="toolbar"><button id="camera">CAMERA · CHASE</button><button id="reset">RESET</button><button id="pause">PAUSE</button><button id="exit">EXIT</button></div><div id="touch"><div class="steering"><button data-key="ArrowLeft" aria-label="Steer left">◀</button><button data-key="ArrowRight" aria-label="Steer right">▶</button></div><div class="pedals"><button data-key="ArrowDown" aria-label="Brake">BRAKE</button><button data-key="ArrowUp" aria-label="Accelerate">GAS</button></div></div></div>
-<div id="toast" role="status"></div><div id="paused" hidden><h2>Take a breath.</h2><button id="resume" class="primary">BACK TO THE DRIVE</button></div>
-<footer><span>458 ITALIA <i>/</i> RWD <i>/</i> TIME ATTACK</span><button id="credits">CREDITS</button><span class="signature">BUILT WITH ASTRA</span></footer>
-<dialog id="creditdialog"><button id="closecredits" aria-label="Close credits">×</button><h2>The details.</h2><p>Ferrari 458 Italia model by <a href="https://sketchfab.com/models/57bf6cc56931426e87494f554df1dab6" target="_blank" rel="noopener">vicent091036</a>, distributed with the <a href="https://threejs.org/examples/webgl_materials_car.html" target="_blank" rel="noopener">Three.js car example</a>. Car materials adapted for this experience.</p><p>Rendering: Three.js (MIT). Geometry decoding: Google Draco (Apache 2.0). Original fictional circuit, environment, interface, and driving code created with Astra.</p><p>An independent interactive demo. Not affiliated with Ferrari. Driving behavior is a simplified game model, not a vehicle simulation.</p><a href="./PROMPT.md" target="_blank">Read the build prompt</a></dialog>
-<script type="module" src="./game.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#070a0b">
+  <meta name="description" content="APEX: Côte d’Azur — a cinematic coastal time attack built in Three.js.">
+  <title>APEX — Côte d’Azur</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./style.css">
+  <script type="importmap">{"imports":{"three":"./assets/three.module.js"}}</script>
+</head>
+<body>
+  <canvas id="world" aria-label="Three dimensional coastal racing circuit"></canvas>
+  <div class="grade"></div>
+  <div class="filmgrain"></div>
+
+  <div id="loading">
+    <div class="loading-mark">APEX</div>
+    <span class="eyebrow">CÔTE D’AZUR / LOADING CIRCUIT</span>
+    <h2>Preparing the grid.</h2>
+    <div class="loadtrack"><i id="loadbar"></i></div>
+    <p id="loadtext">Building the Riviera...</p>
+  </div>
+
+  <header id="topbar">
+    <div class="brand">APEX<span>RIVIERA MOTORSPORT</span></div>
+    <div class="session">
+      <span class="session-dot"></span>
+      <div><b>TIME ATTACK</b><small>FRANCE / 18:42</small></div>
+    </div>
+    <div class="header-actions">
+      <button id="sound" class="ghost-btn" aria-label="Enable engine sound">SOUND OFF</button>
+      <button id="open-settings" class="ghost-btn">SETTINGS</button>
+    </div>
+  </header>
+
+  <main id="intro" hidden>
+    <div class="intro-card">
+      <div class="eyebrow"><b>01</b> RIVIERA TIME ATTACK</div>
+      <h1>Côte<br>d’Azur<span>.</span></h1>
+      <p class="description">One car. One closed road. No assists between you and the coast.</p>
+      <div class="specs">
+        <div><b>458</b><span>ITALIA / RWD</span></div>
+        <div><b id="length">2.1</b><span>KM CIRCUIT</span></div>
+        <div><b>GOLDEN</b><span>HOUR SESSION</span></div>
+      </div>
+      <div class="actions">
+        <button id="drive" class="primary">START TIME ATTACK</button>
+        <button id="showcase" class="secondary">CINEMATIC RUN</button>
+      </div>
+      <p class="instructions">KEYBOARD: WASD / ARROWS · C CAMERA · R RESET · ESC PAUSE<br><span>TOUCH: ANALOG STEERING WHEEL + PEDALS</span></p>
+    </div>
+    <aside class="event-panel">
+      <span class="eyebrow">EVENT</span>
+      <strong>RIVIERA<br>SPRINT 01</strong>
+      <div><span>FORMAT</span><b>HOT LAP</b></div>
+      <div><span>SURFACE</span><b>DRY</b></div>
+      <div><span>BEST</span><b id="intro-best">NO TIME</b></div>
+    </aside>
+  </main>
+
+  <div id="hud" hidden>
+    <section class="race-strip">
+      <div><span>SESSION</span><b id="mode">TIME ATTACK</b></div>
+      <div><span>POSITION</span><b>1 / 1</b></div>
+      <div><span>SECTOR</span><b id="sector">S1</b></div>
+    </section>
+
+    <div class="timing">
+      <span class="eyebrow" id="lap">LAP 01</span>
+      <div id="timer">00:00.000</div>
+      <div class="bestline"><span>BEST</span><b id="best">—</b></div>
+    </div>
+
+    <div class="speedo">
+      <div class="gear"><span>GEAR</span><b id="gear">N</b></div>
+      <div class="speed"><strong id="speed">0</strong><span>KM/H</span></div>
+      <div class="rpm"><i id="rpm"></i></div>
+      <div class="surface-row"><span id="surface">PIT STRAIGHT</span><b id="traction">GRIP</b></div>
+    </div>
+
+    <div class="map">
+      <canvas id="map" width="260" height="210"></canvas>
+      <div><span>CÔTE D’AZUR</span><b>GP</b></div>
+    </div>
+
+    <div class="toolbar">
+      <button id="camera">CAMERA / CHASE</button>
+      <button id="reset">RESTART</button>
+      <button id="pause">PAUSE</button>
+    </div>
+  </div>
+
+  <div id="touch-controls" aria-label="Touch driving controls">
+    <div id="wheel-wrap" class="control-module control-wheel">
+      <span class="control-caption">STEERING</span>
+      <div id="steering-wheel" role="slider" aria-label="Steering wheel" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0">
+        <svg viewBox="0 0 200 200" aria-hidden="true">
+          <circle class="wheel-rim" cx="100" cy="100" r="82"/>
+          <circle class="wheel-rim-inner" cx="100" cy="100" r="68"/>
+          <path class="wheel-spoke" d="M38 65 L83 91 L83 109 L42 141"/>
+          <path class="wheel-spoke" d="M162 65 L117 91 L117 109 L158 141"/>
+          <path class="wheel-spoke" d="M89 111 L73 166 L127 166 L111 111"/>
+          <rect class="wheel-hub" x="80" y="82" width="40" height="36" rx="10"/>
+          <path class="wheel-marker" d="M96 18 H104 L108 36 H92 Z"/>
+        </svg>
+      </div>
+    </div>
+
+    <div id="pedals-wrap" class="control-module control-pedals">
+      <span class="control-caption">PEDALS</span>
+      <button id="brake-pedal" data-key="ArrowDown" class="pedal brake" aria-label="Brake"><span></span><b>BRAKE</b></button>
+      <button id="gas-pedal" data-key="ArrowUp" class="pedal throttle" aria-label="Accelerate"><span></span><b>THROTTLE</b></button>
+    </div>
+  </div>
+
+  <div id="layout-editor" hidden>
+    <div>
+      <b>CONTROL LAYOUT</b>
+      <span>Drag the wheel and pedals. Size them in Settings.</span>
+    </div>
+    <button id="layout-done" class="primary compact">DONE</button>
+  </div>
+
+  <div id="toast" role="status"></div>
+
+  <div id="paused" hidden>
+    <div class="pause-card">
+      <span class="eyebrow">SESSION PAUSED</span>
+      <h2>Riviera Sprint</h2>
+      <p>Your lap clock is stopped.</p>
+      <button id="resume" class="primary">RESUME</button>
+      <button id="pause-reset" class="secondary">RESTART LAP</button>
+      <button id="pause-settings" class="secondary">SETTINGS</button>
+      <button id="exit" class="text-btn">QUIT TO EVENT</button>
+    </div>
+  </div>
+
+  <dialog id="settingsdialog">
+    <div class="dialog-head">
+      <div><span class="eyebrow">GAME SETTINGS</span><h2>Setup</h2></div>
+      <button id="close-settings" class="close-btn" aria-label="Close settings">×</button>
+    </div>
+    <section class="settings-section">
+      <div class="setting-title"><b>TOUCH CONTROLS</b><span>Saved on this device.</span></div>
+      <label>Steering wheel size <output id="wheel-size-value">100%</output><input id="wheel-size" type="range" min="70" max="145" value="100"></label>
+      <label>Pedal size <output id="pedal-size-value">100%</output><input id="pedal-size" type="range" min="75" max="145" value="100"></label>
+      <label>Steering sensitivity <output id="steer-sensitivity-value">100%</output><input id="steer-sensitivity" type="range" min="70" max="140" value="100"></label>
+      <div class="settings-actions">
+        <button id="edit-layout" class="secondary">MOVE CONTROLS ON SCREEN</button>
+        <button id="reset-layout" class="text-btn">RESET CONTROL LAYOUT</button>
+      </div>
+    </section>
+    <section class="settings-section">
+      <div class="setting-title"><b>GRAPHICS</b><span>Choose clarity or battery life.</span></div>
+      <label>Render quality
+        <select id="quality">
+          <option value="performance">PERFORMANCE</option>
+          <option value="balanced">BALANCED</option>
+          <option value="high">HIGH</option>
+        </select>
+      </label>
+    </section>
+  </dialog>
+
+  <dialog id="creditdialog">
+    <button id="closecredits" class="close-btn" aria-label="Close credits">×</button>
+    <span class="eyebrow">CREDITS</span>
+    <h2>The build.</h2>
+    <p>Ferrari 458 Italia model by <a href="https://sketchfab.com/models/57bf6cc56931426e87494f554df1dab6" target="_blank" rel="noopener">vicent091036</a>, distributed with the <a href="https://threejs.org/examples/webgl_materials_car.html" target="_blank" rel="noopener">Three.js car example</a>. Materials adapted for this experience.</p>
+    <p>Rendering: Three.js (MIT). Geometry decoding: Google Draco (Apache 2.0). Original fictional circuit, environment, interface, and driving code created for APEX.</p>
+    <p>Independent interactive project. Not affiliated with Ferrari. Driving behavior is a simplified game model, not a vehicle simulation.</p>
+    <a href="./PROMPT.md" target="_blank">READ BUILD NOTES</a>
+  </dialog>
+
+  <footer id="footer">
+    <button id="credits">CREDITS</button>
+    <span>APEX / RIVIERA MOTORSPORT</span>
+    <span class="signature">THREE.JS REALTIME</span>
+  </footer>
+
+  <script type="module" src="./game.js"></script>
+</body>
+</html>
