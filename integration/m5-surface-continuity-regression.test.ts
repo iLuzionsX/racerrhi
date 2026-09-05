@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { PhysicsMath } from '../.vendor/Racing26/src/physics/math/PhysicsMath';
+import { racerrhiSurfaceMaterialForDistance } from './m5-surface-adapter';
 
 const points = [
   [-225,13,-200],[-225,13,50],[-185,16,245],[-55,22,325],[100,27,265],[155,24,115],
@@ -101,3 +102,54 @@ if(!(smoothMaxNormalStepDeg < legacyMaxNormalStepDeg)){
 if(!(smoothMaxRoadVelocityStep < legacyMaxRoadVelocityStep)){
   throw new Error('interpolated tangent failed to improve suspension road-velocity continuity');
 }
+
+
+const centerMaterial=racerrhiSurfaceMaterialForDistance(0);
+const innerKerb=racerrhiSurfaceMaterialForDistance(7.01);
+const outerKerb=racerrhiSurfaceMaterialForDistance(8.24);
+const justGravel=racerrhiSurfaceMaterialForDistance(8.26);
+const deepGravel=racerrhiSurfaceMaterialForDistance(9.0);
+
+if(centerMaterial.type!=='asphalt'||Math.abs(centerMaterial.friction-1)>1e-12||Math.abs(centerMaterial.rollingResistance-.015)>1e-12){
+  throw new Error('center asphalt material changed');
+}
+if(innerKerb.type!=='kerb'||outerKerb.type!=='kerb'||justGravel.type!=='gravel'){
+  throw new Error('Racerrhi categorical surface boundaries changed');
+}
+if(Math.abs(deepGravel.friction-.55)>1e-12||Math.abs(deepGravel.rollingResistance-.075)>1e-12){
+  throw new Error('deep gravel material changed');
+}
+
+const rrBefore=racerrhiSurfaceMaterialForDistance(7.69).rollingResistance;
+const rrAfter=racerrhiSurfaceMaterialForDistance(7.71).rollingResistance;
+if(Math.abs(rrAfter-rrBefore)>.003){
+  throw new Error('kerb rolling resistance still has a point discontinuity');
+}
+const muBefore=racerrhiSurfaceMaterialForDistance(8.24).friction;
+const muAfter=racerrhiSurfaceMaterialForDistance(8.26).friction;
+if(Math.abs(muAfter-muBefore)>.03){
+  throw new Error('kerb-to-gravel friction transition is still point-like');
+}
+
+let maxMuStep=0,maxRrStep=0;
+let prev=racerrhiSurfaceMaterialForDistance(6.5);
+for(let d=6.51;d<=8.8;d+=.01){
+  const now=racerrhiSurfaceMaterialForDistance(d);
+  maxMuStep=Math.max(maxMuStep,Math.abs(now.friction-prev.friction));
+  maxRrStep=Math.max(maxRrStep,Math.abs(now.rollingResistance-prev.rollingResistance));
+  prev=now;
+}
+if(maxMuStep>.02||maxRrStep>.004){
+  throw new Error('finite contact-patch material blend is not continuous enough');
+}
+console.log(JSON.stringify({
+  scenario:'Racerrhi finite tire contact-patch material transition',
+  centerMaterial,innerKerb,outerKerb,justGravel,deepGravel,
+  oldKerbRollingResistanceJump:0.075-0.015,
+  newKerbRollingResistanceStepAt7_7:Math.abs(rrAfter-rrBefore),
+  oldKerbToGravelFrictionJump:0.88-0.55,
+  newKerbToGravelFrictionStepAt8_25:Math.abs(muAfter-muBefore),
+  maxMuStepPerCm:maxMuStep,
+  maxRollingResistanceStepPerCm:maxRrStep,
+  status:'passed'
+},null,2));
