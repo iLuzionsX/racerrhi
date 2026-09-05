@@ -67,9 +67,17 @@ try{
  const tireGeo=new T.CylinderGeometry(.369,.369,.285,28);tireGeo.rotateZ(Math.PI/2);
  const rimGeo=new T.CylinderGeometry(.268,.268,.292,20);rimGeo.rotateZ(Math.PI/2);
  const frontZ=1.367,rearZ=-1.638;
- for(const [x,z,front] of [[.842,frontZ,true],[-.842,frontZ,true],[.830,rearZ,false],[-.830,rearZ,false]]){
-   const wg=new T.Group(),tire=new T.Mesh(tireGeo,tireMat),rim=new T.Mesh(rimGeo,rimMat);
-   tire.castShadow=tire.receiveShadow=rim.castShadow=true;wg.add(tire,rim);wg.position.set(x,.369,z);wg.userData.front=front;body.add(wg);wheels.push(wg);
+ const wheelLayout=[[.842,frontZ,true],[-.842,frontZ,true],[.830,rearZ,false],[-.830,rearZ,false]];
+ for(let wheelIndex=0;wheelIndex<wheelLayout.length;wheelIndex++){
+   const [x,z,front]=wheelLayout[wheelIndex];
+   // Keep steering and rolling on separate transform nodes. Combining them on one
+   // Euler rotation makes a steered spinning wheel precess/tumble visually.
+   const steerPivot=new T.Group(),spinPivot=new T.Group();
+   const tire=new T.Mesh(tireGeo,tireMat),rim=new T.Mesh(rimGeo,rimMat);
+   tire.castShadow=tire.receiveShadow=rim.castShadow=true;
+   spinPivot.add(tire,rim);steerPivot.add(spinPivot);steerPivot.position.set(x,.369,z);
+   steerPivot.userData.front=front;steerPivot.userData.index=wheelIndex;steerPivot.userData.spinPivot=spinPivot;
+   body.add(steerPivot);wheels.push(steerPivot);
  }
  modelLoaded=true;
 }catch(e){$('loadtext').textContent='The BMW M5 could not load. Reload to retry.';console.error(e);throw e;}
@@ -94,7 +102,7 @@ let lastRoad=nearest(state.x,state.z),lastCameraTarget=V(),wheelSpin=0;function 
  const finish=advanceLap(lap,lastRoad.t,lastRoad.distance<9,Math.abs(state.speed)>.5||lap.elapsed>0?dt:0);if(finish!==null){if(session==='attack'&&(!best||finish<best)){best=finish;try{localStorage.setItem('apex-best-v1',String(best));}catch{}$('best').textContent=fmt(best);toast('Personal best · '+fmt(best));}else toast('Lap complete · '+fmt(finish));}
 }else{const a=at(.022);state.x=a.p.x;state.z=a.p.z;state.speed=0;state.heading=Math.atan2(a.d.x,a.d.z);state.roll=state.pitch=0;lastRoad={...a,distance:0};}
 }
-function frame(now){requestAnimationFrame(frame);const dt=Math.min((now-prev)/1000,.06);prev=now;clock+=dt;if(!paused){accumulator+=dt;while(accumulator>=1/120){simulate(1/120);accumulator-=1/120;}const road=lastRoad;car.position.set(state.x,road.p.y+.035,state.z);car.rotation.y=state.heading;const grade=Math.atan2(road.d.y,Math.hypot(road.d.x,road.d.z));body.rotation.x=state.pitch;body.rotation.z=clamp(state.roll,-.20,.20);wheelSpin+=state.speed*dt/.369;for(const w of wheels){w.rotation.x=-wheelSpin;if(w.userData.front)w.rotation.y=state.steer;}
+function frame(now){requestAnimationFrame(frame);const dt=Math.min((now-prev)/1000,.06);prev=now;clock+=dt;if(!paused){accumulator+=dt;while(accumulator>=1/120){simulate(1/120);accumulator-=1/120;}const road=lastRoad;car.position.set(state.x,road.p.y+.035,state.z);car.rotation.y=state.heading;const grade=Math.atan2(road.d.y,Math.hypot(road.d.x,road.d.z));body.rotation.x=state.pitch;body.rotation.z=clamp(state.roll,-.20,.20);wheelSpin+=state.speed*dt/.369;for(const w of wheels){const ws=state.wheels?.[w.userData.index];const spin=ws?.rotationAngle??wheelSpin;w.userData.spinPivot.rotation.x=-spin;const steer=ws?.steerAngle??(w.userData.front?state.steer:0);w.rotation.y=-steer;}
 const f=V(Math.sin(state.heading),0,Math.cos(state.heading)),right=V(f.z,0,-f.x),target=car.position.clone().add(V(0,1.0,0));let desired;
 if(mode==='intro'){desired=target.clone().addScaledVector(f,8.8).addScaledVector(right,-8.3).add(V(0,3.0,0));target.addScaledVector(right,-3.0);camera.fov=45;}
 else if(cam===0){desired=target.clone().addScaledVector(f,-8.5-Math.abs(state.speed)*.035).add(V(0,3.3,0));target.addScaledVector(f,5);camera.fov=53+Math.abs(state.speed)*.14;}
