@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {sanitize,bounds,angleDelta,steerFromAngle} from './dist/controls.mjs';
+import {chaseCameraProfile,estimatedSteadyStateLagM} from './dist/chase-camera.mjs';
 for(const [w,h] of [[320,568],[390,844],[844,390],[1920,1080]])for(const x of [0,.5,1]){const c=sanitize({wheelSize:300,pedalSize:115,wheelX:x,wheelY:x,pedalX:x,pedalY:x});for(const r of [bounds(c,w,h).wheel,bounds(c,w,h).pedals]){assert(r.x>=0&&r.y>=0&&r.x+r.width<=w&&r.y+r.height<=h);}}
 for(const [w,h] of [[320,568],[390,844]]){const c=sanitize({});const b=bounds(c,w,h);assert(b.wheel.x+b.wheel.width<=b.pedals.x||b.pedals.x+b.pedals.width<=b.wheel.x);}
 assert.equal(sanitize(null).wheelSize,210);assert.equal(sanitize({wheelSize:999,quality:'invalid'}).wheelSize,300);assert.equal(sanitize({wheelX:NaN}).wheelX,.02);assert.equal(sanitize({pedalX:NaN}).pedalX,.98);assert(Math.abs(angleDelta(Math.PI-.1,-Math.PI+.1)-.2)<1e-10);assert.equal(steerFromAngle(Math.PI),1);assert.equal(steerFromAngle(-Math.PI),-1);console.log('PASS control bounds, saved-setting validation and steering wrap');
@@ -34,8 +35,24 @@ assert(gameSource.includes('car.add(steerPivot)'));assert(!gameSource.includes('
 const indexSource=fs.readFileSync(new URL('./dist/index.html',import.meta.url),'utf8');
 const uiSource=fs.readFileSync(new URL('./dist/ui.js',import.meta.url),'utf8');
 assert(gameSource.includes('w.rotation.y=steer;'));assert(!gameSource.includes('w.rotation.y=-steer;'));console.log('PASS M5 render steering sign matches vehicle turn direction');
-assert(indexSource.includes('maximum-scale=1,user-scalable=no'));assert(indexSource.includes('./ui.js?v=4')&&indexSource.includes('./game.js?v=5'));assert(uiSource.includes("document.addEventListener('touchend'")&&uiSource.includes("{passive:false}"));console.log('PASS Mobile Safari double-tap zoom suppression and cache-busted controls');
+assert(indexSource.includes('maximum-scale=1,user-scalable=no'));assert(indexSource.includes('./ui.js?v=4')&&indexSource.includes('./game.js?v=6'));assert(uiSource.includes("document.addEventListener('touchend'")&&uiSource.includes("{passive:false}"));console.log('PASS Mobile Safari double-tap zoom suppression and cache-busted controls');
 
-assert(uiSource.includes("'gesturestart','gesturechange','gestureend'"));assert(uiSource.includes("e.touches.length>1")&&uiSource.includes("document.addEventListener('touchmove'"));assert(indexSource.includes('./ui.js?v=4')&&indexSource.includes('./game.js?v=5'));assert(gameSource.includes("./ui.js?v=4"));console.log('PASS Mobile Safari pinch zoom suppression and synchronized v4 module cache bust');
+assert(uiSource.includes("'gesturestart','gesturechange','gestureend'"));assert(uiSource.includes("e.touches.length>1")&&uiSource.includes("document.addEventListener('touchmove'"));assert(indexSource.includes('./ui.js?v=4')&&indexSource.includes('./game.js?v=6'));assert(gameSource.includes("./ui.js?v=4"));console.log('PASS Mobile Safari pinch zoom suppression and synchronized v4 module cache bust');
 
 assert(gameSource.includes("d=a.d.clone().lerp(b.d,u).normalize()"));assert(gameSource.includes("n=a.n.clone().lerp(b.n,u).normalize()"));console.log('PASS Racerrhi road tangent/normal interpolation for M5 suspension continuity');
+
+for(const kph of [100,200,300]){
+  const speed=kph/3.6;
+  const p=chaseCameraProfile(speed);
+  assert(p.distanceM>=8.5&&p.distanceM<=9.4);
+  assert(p.fovDeg>=53&&p.fovDeg<=57.5);
+  assert(p.followRate>=4&&p.followRate<=12);
+  assert.equal(p.maxWorldLagM,2.6);
+}
+const old200Lag=estimatedSteadyStateLagM(200/3.6,4);
+assert(old200Lag>13);
+const high=chaseCameraProfile(300/3.6);
+assert(high.distanceM+high.maxWorldLagM<=12.01);
+assert(gameSource.includes("chaseCameraProfile(state.speed)"));
+assert(gameSource.includes("chaseErrorLength>chaseProfile.maxWorldLagM"));
+console.log('PASS chase camera high-speed pullback and world-space lag are bounded');
