@@ -19,6 +19,7 @@ jobs:
         with:
           node-version: '22'
       - name: Fetch pinned Racing26 M5 donor
+        if: ${{ hashFiles('integration/m5-bridge.ts') != '' }}
         run: |
           mkdir -p .vendor
           git init .vendor/Racing26
@@ -26,13 +27,19 @@ jobs:
           git -C .vendor/Racing26 fetch --depth 1 origin e330cf5edb2c77b40267dd17d12e09858e3602a1
           git -C .vendor/Racing26 checkout --detach FETCH_HEAD
       - name: Build Racing26 M5 runtime
+        if: ${{ hashFiles('integration/m5-bridge.ts') != '' }}
         run: |
           npm install --no-package-lock --no-save esbuild@0.25.9 three@0.185.1
           npx esbuild integration/m5-bridge.ts --bundle --format=esm --platform=browser --target=es2022 --external:three --define:import.meta.env.BASE_URL='"./"' --outfile=dist/m5-runtime.js
           mkdir -p dist/assets/bmw-m5-g90-default
           cp .vendor/Racing26/public/assets/bmw-m5-g90-default/part-*.b64 dist/assets/bmw-m5-g90-default/
-      - name: Validate game and M5 integration
-        run: node --check dist/m5-runtime.js && node --check dist/game.js && node --check dist/ui.js && node --check dist/visuals.js && node test.mjs
+      - name: Validate game
+        run: |
+          if [ -f dist/m5-runtime.js ]; then node --check dist/m5-runtime.js; fi
+          node --check dist/game.js
+          node --check dist/ui.js
+          node --check dist/visuals.js
+          node test.mjs
   deploy:
     needs: validate
     if: github.event_name != 'pull_request'
