@@ -48,3 +48,44 @@ function run(speedKmh:number,steer:number,throttle:number){
 const cases:any[]=[];
 for(const speed of [60,80,100,120]) for(const steer of [.12,.18,.24,.30,.40]) for(const throttle of [0,.3,.7]) cases.push(run(speed,steer,throttle));
 console.log(JSON.stringify({cases},null,2));
+
+
+const flatProvider={sampleSurface(){return{elevation:0,normal:PhysicsMath.vec3(0,1,0),slopePitch:0,slopeRoll:0,type:'asphalt',friction:1,rollingResistance:.015,wetness:0,isKerbRumble:false};}};
+
+function launchedCase(speedKmh:number, steer:number, throttle:number, tcsMode:'OFF'|'SPORT'|'FULL'='SPORT'){
+ const localCfg:any={...cfg,tcsMode};
+ const sim=new Simulation(localCfg,flatProvider as any);sim.reset(0,0,0);sim.vehicle.powertrain.isAutomatic=true;
+ for(let i=0;i<240;i++)sim.stepExplicit(neutral,1);
+ const target=speedKmh/3.6;
+ let launchSteps=0;
+ while(Math.abs(sim.vehicle.rigidBody.getLocalVelocity().z)<target && launchSteps<2400){
+   sim.stepExplicit({...neutral,throttle:1},1);launchSteps++;
+ }
+ const before=sim.vehicle.getState();
+ const launchSpeed=Math.abs(sim.vehicle.rigidBody.getLocalVelocity().z);
+ const launchGear=(sim.vehicle.powertrain as any).gear;
+ const launchRpm=(sim.vehicle.powertrain as any).engineRpm;
+ (sim.vehicle as any).surfaceProvider=provider;
+ sim.vehicle.rigidBody.position=PhysicsMath.vec3(station.p.x,station.p.y+localCfg.centerOfGravityHeight,station.p.z);
+ sim.vehicle.rigidBody.orientation=PhysicsMath.quatFromEuler(0,yaw,0);
+ sim.vehicle.rigidBody.velocity=PhysicsMath.quatRotateVec3(sim.vehicle.rigidBody.orientation,PhysicsMath.vec3(0,0,launchSpeed));
+ sim.vehicle.rigidBody.angularVelocity=PhysicsMath.vec3(0,0,0);
+ sim.vehicle.suspension.reset();sim.suspensionKinematics.reset();
+ sim.vehicle.wheels.forEach((w:any)=>w.reset(launchSpeed));
+ let peakRear=0,peakFront=0,peakYaw=0,peakKappa=0,minFz=Infinity;
+ for(let i=0;i<180;i++){
+   const ramp=Math.min(1,(i+1)/60);
+   const s=sim.stepExplicit({...neutral,steer:steer*ramp,throttle},1);
+   peakRear=Math.max(peakRear,Math.max(Math.abs(s.wheels[2].slipAngle),Math.abs(s.wheels[3].slipAngle))*180/Math.PI);
+   peakFront=Math.max(peakFront,Math.max(Math.abs(s.wheels[0].slipAngle),Math.abs(s.wheels[1].slipAngle))*180/Math.PI);
+   peakYaw=Math.max(peakYaw,Math.abs(s.yawRate)*180/Math.PI);
+   peakKappa=Math.max(peakKappa,...s.wheels.map((w:any)=>Math.abs(w.slipRatio)));
+   minFz=Math.min(minFz,...s.wheels.map((w:any)=>w.forceVectorNorm));
+ }
+ const end=sim.vehicle.getState();
+ return{speedKmh,steer,throttle,tcsMode,launchSteps,launchSpeedKmh:launchSpeed*3.6,launchGear,launchRpm,peakRearSlipDeg:peakRear,peakFrontSlipDeg:peakFront,peakYawDegS:peakYaw,peakKappa,minWheelFzN:minFz,finalSpeedKmh:end.speedKmh,finalGear:(sim.vehicle.powertrain as any).gear,finalRpm:(sim.vehicle.powertrain as any).engineRpm};
+}
+
+const launched:any[]=[];
+for(const speed of [80,100,120]) for(const throttle of [.15,.3,.7]) for(const mode of ['OFF','SPORT','FULL'] as const) launched.push(launchedCase(speed,.18,throttle,mode));
+console.log(JSON.stringify({launchedCases:launched},null,2));
