@@ -246,8 +246,11 @@ const smoothEdge=runEdgeCrossing(true);
 if(!(smoothEdge.maxWheelForceStepN<legacyEdge.maxWheelForceStepN)){
   throw new Error('finite contact patch did not reduce per-step wheel force jump');
 }
-if(!(smoothEdge.maxYawRateStepDegS<legacyEdge.maxYawRateStepDegS*1.05)){
-  throw new Error('finite contact patch worsened yaw impulse across material edge');
+if(!(smoothEdge.maxYawRateStepDegS<legacyEdge.maxYawRateStepDegS*.80)){
+  throw new Error('finite contact patch did not materially reduce yaw impulse across material edge');
+}
+if(!(smoothEdge.peakYawDegS<legacyEdge.peakYawDegS*.50)){
+  throw new Error('finite contact patch did not materially reduce peak edge-induced yaw');
 }
 console.log(JSON.stringify({
   scenario:'Full M5 kerb-to-gravel edge crossing A/B',
