@@ -3,6 +3,7 @@ import { PhysicsMath } from '../.vendor/Racing26/src/physics/math/PhysicsMath';
 import { DEFAULT_VEHICLE_CONFIG } from '../.vendor/Racing26/src/physics/vehiclePresets';
 import { BMW_M5_2025_OVERRIDES } from '../.vendor/Racing26/src/physics/m5G90';
 import { loadBundledM5Visual } from '../.vendor/Racing26/src/graphics/bundledM5Visual';
+import { racerrhiSteeringTargetForM5 } from './m5-steering-adapter';
 
 export const M5_PHYSICS_SOURCE = Object.freeze({
   repository: 'iLuzionsX/Racing26',
@@ -154,7 +155,7 @@ export function stepCar(state: any, input: any, dt: number, _road?: RoadSample) 
     throttle: Math.max(0, Math.min(1, Number(input?.throttle) || 0)),
     brake: Math.max(0, Math.min(1, Number(input?.brake) || 0)),
     steer: 0,
-    analogSteerTarget: -Math.max(-1, Math.min(1, Number(input?.steer) || 0)),
+    analogSteerTarget: racerrhiSteeringTargetForM5(sim, Number(input?.steer) || 0),
     handbrake: Boolean(input?.handbrake),
     shiftUp: false,
     shiftDown: false,
