@@ -30,3 +30,9 @@ for(const el of document.querySelectorAll('[data-session]'))el.onclick=()=>{sess
 $('drive').onclick=()=>command('start',session);$('camera').onclick=()=>command('camera');$('pause').onclick=()=>{clearInput();command('pause',true);$('pause-dialog').showModal();};$('resume').onclick=()=>{$('pause-dialog').close();command('pause',false);};$('restart').onclick=()=>{$('pause-dialog').close();command('restart');};$('exit').onclick=()=>{$('pause-dialog').close();command('exit');};$('pause-dialog').oncancel=()=>command('pause',false);
 $('credits').onclick=()=>$('creditdialog').showModal();$('closecredits').onclick=()=>$('creditdialog').close();
 addEventListener('resize',()=>{clearInput();layout();});addEventListener('blur',clearInput);document.addEventListener('visibilitychange',()=>{if(document.hidden)clearInput();});refresh();
+
+// Mobile Safari can still recognize a rapid second tap as browser zoom even when
+// the game surface uses touch-action:none. Cancel only that second touch-end so
+// fast steering/pedal taps remain game input instead of viewport zoom.
+let lastTouchEnd=0;
+document.addEventListener('touchend',e=>{const now=performance.now();if(now-lastTouchEnd<350)e.preventDefault();lastTouchEnd=now;},{passive:false});
