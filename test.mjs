@@ -8,7 +8,7 @@ assert.equal(sanitize(null).wheelSize,210);assert.equal(sanitize({wheelSize:999,
 import {newCar,stepCar,setCarPose,getM5PhysicsMetadata,advanceLap} from './dist/physics.mjs';
 const meta=getM5PhysicsMetadata();
 assert.equal(meta.repository,'iLuzionsX/Racing26');
-assert.equal(meta.commit,'e330cf5edb2c77b40267dd17d12e09858e3602a1');
+assert.equal(meta.commit,'abff9f452e4c2b22ac1220a1414418ace3f36e0a');
 assert(Math.abs(meta.massKg-2381.8135)<.01);
 assert.equal(meta.drivetrain,'AWD');
 assert.equal(meta.fixedStepHz,120);
