@@ -30,3 +30,8 @@ l=lap();for(const t of [.05,.26,.51,.76,.95])advanceLap(l,t,t!==.51,10);assert.e
 
 const gameSource=fs.readFileSync(new URL('./dist/game.js',import.meta.url),'utf8');
 assert(gameSource.includes('car.add(steerPivot)'));assert(!gameSource.includes('body.add(steerPivot)'));assert(gameSource.includes('const chassisCgLocalY=.52-.035'));console.log('PASS wheel assemblies are decoupled from chassis roll/pitch');
+
+const indexSource=fs.readFileSync(new URL('./dist/index.html',import.meta.url),'utf8');
+const uiSource=fs.readFileSync(new URL('./dist/ui.js',import.meta.url),'utf8');
+assert(gameSource.includes('w.rotation.y=steer;'));assert(!gameSource.includes('w.rotation.y=-steer;'));console.log('PASS M5 render steering sign matches vehicle turn direction');
+assert(indexSource.includes('maximum-scale=1,user-scalable=no'));assert(indexSource.includes('./ui.js?v=3')&&indexSource.includes('./game.js?v=3'));assert(uiSource.includes("document.addEventListener('touchend'")&&uiSource.includes("{passive:false}"));console.log('PASS Mobile Safari double-tap zoom suppression and cache-busted controls');
