@@ -103,6 +103,16 @@ function hydrate(target: any, raw: any) {
   );
   target.gear = Number.isFinite(raw.gear) ? raw.gear : 0;
   target.rpm = Number(raw.rpm) || 0;
+  target.wheels = Array.isArray(raw.wheels)
+    ? raw.wheels.map((wheel: any) => ({
+        id: wheel.id,
+        isFront: Boolean(wheel.isFront),
+        isLeft: Boolean(wheel.isLeft),
+        steerAngle: Number(wheel.steerAngle) || 0,
+        rotationAngle: Number(wheel.rotationAngle) || 0,
+        verticalTravelM: Number(wheel.verticalTravelM) || 0,
+      }))
+    : [];
   return target;
 }
 
