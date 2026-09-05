@@ -60,6 +60,11 @@ const car=new T.Group(),body=new T.Group();car.add(body);scene.add(car);let whee
 try{
  const visual=await loadM5Visual();
  const model=visual.group;
+ // The compact visual is ground-referenced. Pivot the chassis about the real M5 CG
+ // while leaving the wheel assemblies road-relative under the car root.
+ const chassisCgLocalY=.52-.035;
+ body.position.y=chassisCgLocalY;
+ model.position.y=-chassisCgLocalY;
  body.add(model);
  model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material)o.material.envMapIntensity=Math.max(1.15,o.material.envMapIntensity||0);}});
  const tireMat=new T.MeshStandardMaterial({color:'#111317',roughness:.9,metalness:.04});
@@ -75,9 +80,12 @@ try{
    const steerPivot=new T.Group(),spinPivot=new T.Group();
    const tire=new T.Mesh(tireGeo,tireMat),rim=new T.Mesh(rimGeo,rimMat);
    tire.castShadow=tire.receiveShadow=rim.castShadow=true;
-   spinPivot.add(tire,rim);steerPivot.add(spinPivot);steerPivot.position.set(x,.369,z);
+   spinPivot.add(tire,rim);steerPivot.add(spinPivot);
+   // `car` sits 35 mm above the sampled road. Keep the hub at the physical
+   // 369 mm wheel radius and do NOT inherit chassis pitch/roll from `body`.
+   steerPivot.position.set(x,.369-.035,z);
    steerPivot.userData.front=front;steerPivot.userData.index=wheelIndex;steerPivot.userData.spinPivot=spinPivot;
-   body.add(steerPivot);wheels.push(steerPivot);
+   car.add(steerPivot);wheels.push(steerPivot);
  }
  modelLoaded=true;
 }catch(e){$('loadtext').textContent='The BMW M5 could not load. Reload to retry.';console.error(e);throw e;}
