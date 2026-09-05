@@ -1,10 +1,9 @@
 import { Simulation } from '../.vendor/Racing26/src/physics/Simulation';
 import { PhysicsMath } from '../.vendor/Racing26/src/physics/math/PhysicsMath';
-import { DEFAULT_VEHICLE_CONFIG } from '../.vendor/Racing26/src/physics/vehiclePresets';
-import { BMW_M5_2025_OVERRIDES } from '../.vendor/Racing26/src/physics/m5G90';
 import { loadBundledM5Visual } from '../.vendor/Racing26/src/graphics/bundledM5Visual';
 import { racerrhiSteeringTargetForM5 } from './m5-steering-adapter';
 import { racerrhiSurfaceMaterialForDistance } from './m5-surface-adapter';
+import { createRacerrhiM5Config, RACERRHI_M5_REFERENCE_LOADS } from './m5-config';
 
 export const M5_PHYSICS_SOURCE = Object.freeze({
   repository: 'iLuzionsX/Racing26',
@@ -13,10 +12,7 @@ export const M5_PHYSICS_SOURCE = Object.freeze({
   fixedStepHz: 120,
 });
 
-const M5_CONFIG: any = {
-  ...DEFAULT_VEHICLE_CONFIG,
-  ...BMW_M5_2025_OVERRIDES,
-};
+const M5_CONFIG: any = createRacerrhiM5Config();
 
 type RoadSample = {
   p?: { x?: number; y?: number; z?: number };
@@ -180,6 +176,8 @@ export function getM5PhysicsMetadata() {
     rearTrackM: M5_CONFIG.trackWidthRear,
     drivetrain: M5_CONFIG.drivetrain,
     tireModel: 'Racing26 four-wheel transient tire model',
+    tireReferenceLoadFrontN: RACERRHI_M5_REFERENCE_LOADS.frontN,
+    tireReferenceLoadRearN: RACERRHI_M5_REFERENCE_LOADS.rearN,
   };
 }
 
