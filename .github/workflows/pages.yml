@@ -2,6 +2,8 @@ name: Publish APEX to GitHub Pages
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
@@ -23,9 +25,12 @@ jobs:
           node-version: '22'
       - run: node --check dist/game.js && node --check dist/ui.js && node --check dist/visuals.js && node test.mjs
       - uses: actions/configure-pages@v5
+        if: github.event_name != 'pull_request'
       - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
         with:
           path: dist
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+        if: github.event_name != 'pull_request'
