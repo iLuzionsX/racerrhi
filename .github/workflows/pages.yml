@@ -35,8 +35,8 @@ jobs:
           cp .vendor/Racing26/public/assets/bmw-m5-g90-default/part-*.b64 dist/assets/bmw-m5-g90-default/
       - name: Validate Racerrhi M5 disturbance recovery
         run: npx --yes tsx@4.20.6 integration/m5-racerrhi-recovery.test.ts
-      - name: Diagnose Racerrhi first turn
-        run: npx --yes tsx@4.20.6 integration/m5-first-turn-diagnostic.test.ts
+      - name: Validate Racerrhi first-turn steering
+        run: npx --yes tsx@4.20.6 integration/m5-first-turn-regression.test.ts
       - name: Validate game
         run: |
           if [ -f dist/m5-runtime.js ]; then node --check dist/m5-runtime.js; fi
