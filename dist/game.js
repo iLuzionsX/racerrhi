@@ -1,7 +1,7 @@
 import * as T from 'three';
 import {clamp} from './controls.mjs';
 import {stepCar,newCar,advanceLap,setSurfaceSampler,setCarPose,loadM5Visual} from './physics.mjs';
-import {config,input as touchInput,clearInput,sessionVisible} from './ui.js?v=2';
+import {config,input as touchInput,clearInput,sessionVisible} from './ui.js?v=3';
 import {surfaces,foliage,furniture} from './visuals.js';
 const $=id=>document.getElementById(id),TAU=Math.PI*2,wrapAngle=a=>Math.atan2(Math.sin(a),Math.cos(a));
 let renderer;try{renderer=new T.WebGLRenderer({canvas:$('world'),antialias:true,powerPreference:'high-performance'});}catch(e){$('loadtext').textContent='This drive needs WebGL 2. Try a current browser with hardware acceleration enabled.';throw e;}
@@ -110,7 +110,7 @@ let lastRoad=nearest(state.x,state.z),lastCameraTarget=V(),wheelSpin=0;function 
  const finish=advanceLap(lap,lastRoad.t,lastRoad.distance<9,Math.abs(state.speed)>.5||lap.elapsed>0?dt:0);if(finish!==null){if(session==='attack'&&(!best||finish<best)){best=finish;try{localStorage.setItem('apex-best-v1',String(best));}catch{}$('best').textContent=fmt(best);toast('Personal best · '+fmt(best));}else toast('Lap complete · '+fmt(finish));}
 }else{const a=at(.022);state.x=a.p.x;state.z=a.p.z;state.speed=0;state.heading=Math.atan2(a.d.x,a.d.z);state.roll=state.pitch=0;lastRoad={...a,distance:0};}
 }
-function frame(now){requestAnimationFrame(frame);const dt=Math.min((now-prev)/1000,.06);prev=now;clock+=dt;if(!paused){accumulator+=dt;while(accumulator>=1/120){simulate(1/120);accumulator-=1/120;}const road=lastRoad;car.position.set(state.x,road.p.y+.035,state.z);car.rotation.y=state.heading;const grade=Math.atan2(road.d.y,Math.hypot(road.d.x,road.d.z));body.rotation.x=state.pitch;body.rotation.z=clamp(state.roll,-.20,.20);wheelSpin+=state.speed*dt/.369;for(const w of wheels){const ws=state.wheels?.[w.userData.index];const spin=ws?.rotationAngle??wheelSpin;w.userData.spinPivot.rotation.x=-spin;const steer=ws?.steerAngle??(w.userData.front?state.steer:0);w.rotation.y=-steer;}
+function frame(now){requestAnimationFrame(frame);const dt=Math.min((now-prev)/1000,.06);prev=now;clock+=dt;if(!paused){accumulator+=dt;while(accumulator>=1/120){simulate(1/120);accumulator-=1/120;}const road=lastRoad;car.position.set(state.x,road.p.y+.035,state.z);car.rotation.y=state.heading;const grade=Math.atan2(road.d.y,Math.hypot(road.d.x,road.d.z));body.rotation.x=state.pitch;body.rotation.z=clamp(state.roll,-.20,.20);wheelSpin+=state.speed*dt/.369;for(const w of wheels){const ws=state.wheels?.[w.userData.index];const spin=ws?.rotationAngle??wheelSpin;w.userData.spinPivot.rotation.x=-spin;const steer=ws?.steerAngle??(w.userData.front?state.steer:0);w.rotation.y=steer;}
 const f=V(Math.sin(state.heading),0,Math.cos(state.heading)),right=V(f.z,0,-f.x),target=car.position.clone().add(V(0,1.0,0));let desired;
 if(mode==='intro'){desired=target.clone().addScaledVector(f,8.8).addScaledVector(right,-8.3).add(V(0,3.0,0));target.addScaledVector(right,-3.0);camera.fov=45;}
 else if(cam===0){desired=target.clone().addScaledVector(f,-8.5-Math.abs(state.speed)*.035).add(V(0,3.3,0));target.addScaledVector(f,5);camera.fov=53+Math.abs(state.speed)*.14;}
