@@ -53,6 +53,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Fetch pinned Racing26 M5 donor
+        run: |
+          mkdir -p .vendor
+          git init .vendor/Racing26
+          git -C .vendor/Racing26 remote add origin https://github.com/iLuzionsX/Racing26.git
+          git -C .vendor/Racing26 fetch --depth 1 origin e330cf5edb2c77b40267dd17d12e09858e3602a1
+          git -C .vendor/Racing26 checkout --detach FETCH_HEAD
+      - name: Build deployable Racing26 M5 runtime
+        run: |
+          npm install --no-package-lock --no-save esbuild@0.25.9 three@0.185.1
+          npx esbuild integration/m5-bridge.ts --bundle --format=esm --platform=browser --target=es2022 --external:three --define:import.meta.env.BASE_URL='"./"' --outfile=dist/m5-runtime.js
+          mkdir -p dist/assets/bmw-m5-g90-default
+          cp .vendor/Racing26/public/assets/bmw-m5-g90-default/part-*.b64 dist/assets/bmw-m5-g90-default/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
