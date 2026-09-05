@@ -6,7 +6,7 @@ import { loadBundledM5Visual } from '../.vendor/Racing26/src/graphics/bundledM5V
 
 export const M5_PHYSICS_SOURCE = Object.freeze({
   repository: 'iLuzionsX/Racing26',
-  commit: 'e330cf5edb2c77b40267dd17d12e09858e3602a1',
+  commit: 'abff9f452e4c2b22ac1220a1414418ace3f36e0a',
   preset: '2025 BMW M5 (G90)',
   fixedStepHz: 120,
 });
