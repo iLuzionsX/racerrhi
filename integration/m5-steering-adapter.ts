@@ -109,8 +109,7 @@ export function updateRacerrhiKeyboardSteeringInput(
   // Reversal is explicitly two-stage: unwind first, then build the opposite
   // request. This prevents one fast slew step from blasting through center.
   if (reversing) {
-    const unwindReference = Math.max(Math.abs(current), 0.12);
-    const unwindRate = unwindReference / 0.16;
+    const unwindRate = 6.0;
     const timeToCenter = Math.abs(current) / unwindRate;
     if (dt <= timeToCenter) {
       return moveToward(current, 0, unwindRate * dt);
@@ -123,10 +122,9 @@ export function updateRacerrhiKeyboardSteeringInput(
   }
 
   if (direction === 0) {
-    // Quick, smooth release. The small reference floor avoids a long tail near
-    // center without creating an input deadzone.
-    const releaseRate = Math.max(Math.abs(current), 0.08) / 0.16;
-    return moveToward(current, 0, releaseRate * dt);
+    // Quick, smooth release with no exponential tail. Six rack-fractions per
+    // second returns even full lock in about 0.17 s at the fixed 120 Hz cadence.
+    return moveToward(current, 0, 6.0 * dt);
   }
 
   // If acceleration or another state change lowers the useful envelope while a
@@ -135,8 +133,7 @@ export function updateRacerrhiKeyboardSteeringInput(
     Math.sign(current) === Math.sign(target) &&
     Math.abs(current) > Math.abs(target)
   ) {
-    const trimRate = Math.max(Math.abs(current), Math.abs(target), 0.08) / 0.20;
-    return moveToward(current, target, trimRate * dt);
+    return moveToward(current, target, 4.0 * dt);
   }
 
   // Normal wind-on takes ~0.58 s from center to the current ordinary limit,
