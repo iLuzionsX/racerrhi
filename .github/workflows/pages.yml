@@ -1,7 +1,7 @@
 name: Publish APEX to GitHub Pages
 on:
   push:
-    branches: [main, astra/physics-pipeline-repair]
+    branches: [main, astra/physics-pipeline-repair, astra/progressive-tyre-recovery]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -35,6 +35,8 @@ jobs:
           cp .vendor/Racing26/public/assets/bmw-m5-g90-default/part-*.b64 dist/assets/bmw-m5-g90-default/
       - name: Validate Racerrhi physics pipeline integration
         run: npx --yes tsx@4.20.6 integration/m5-pipeline-regression.test.ts
+      - name: Diagnose Racerrhi grip-limit response
+        run: npx --yes tsx@4.20.6 integration/m5-grip-limit-regression.test.ts
       - name: Validate Racerrhi deterministic tire reference loads
         run: npx --yes tsx@4.20.6 integration/m5-reference-load-regression.test.ts
       - name: Validate Racerrhi M5 disturbance recovery
