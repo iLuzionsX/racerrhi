@@ -1,7 +1,7 @@
 import { Simulation } from '../.vendor/Racing26/src/physics/Simulation';
 import { PhysicsMath } from '../.vendor/Racing26/src/physics/math/PhysicsMath';
 import type { VehicleState } from '../.vendor/Racing26/src/types';
-import { racerrhiSteeringTargetForM5 } from './m5-steering-adapter';
+import { racerrhiSteeringTargetForM5, updateRacerrhiKeyboardSteeringInput } from './m5-steering-adapter';
 import { racerrhiSurfaceMaterialForDistance } from './m5-surface-adapter';
 import { createRacerrhiM5Config, RACERRHI_M5_REFERENCE_LOADS } from './m5-config';
 
@@ -435,11 +435,24 @@ function steeringInputsForStep(sim: Simulation, input: M5ControlInput) {
       Math.abs(sim.digitalSteeringInput) <= 1e-7 &&
       Math.abs(sim.analogSteeringInput) > 1e-7
     ) {
-      // Symmetric handoff back to keyboard. Digital steering keeps its own
-      // speed envelope and fast countersteer/reversal rates after this seed.
+      // Seed keyboard ownership from the outgoing analog command so handoff is
+      // continuous, then let Racerrhi's time-normalized key ramp take over.
       sim.resetDigitalSteeringInput(sim.analogSteeringInput);
     }
-    return { digitalSteerDirection: direction };
+
+    const nextDigital = updateRacerrhiKeyboardSteeringInput(
+      sim,
+      sim.digitalSteeringInput,
+      direction,
+      sim.fixedDt
+    );
+    sim.resetAnalogSteeringInput(0);
+    sim.resetDigitalSteeringInput(nextDigital);
+
+    // Supply the already-integrated rack request directly. Passing
+    // digitalSteerDirection here would apply the donor's second fixed-rate slew
+    // and reintroduce the high-speed "instant limit" problem.
+    return { steer: nextDigital };
   }
 
   if (Number.isFinite(input.analogSteerTarget)) {
