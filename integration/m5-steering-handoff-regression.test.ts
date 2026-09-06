@@ -247,11 +247,18 @@ assert(
   'touch release-to-neutral became less continuous',
 );
 assert(
-  Math.abs(
-    scenarios.keyboardCountersteer.corrected.effectiveJump -
+  scenarios.keyboardCountersteer.corrected.beforeEffective *
+    scenarios.keyboardCountersteer.corrected.afterEffective > 0,
+  'keyboard countersteer crossed center in one fixed step',
+);
+assert(
+  scenarios.keyboardCountersteer.corrected.effectiveJump > 0,
+  'opposite keyboard input did not begin unwinding immediately',
+);
+assert(
+  scenarios.keyboardCountersteer.corrected.effectiveJump <
     scenarios.keyboardCountersteer.legacy.effectiveJump,
-  ) < 1e-9,
-  'pure digital countersteer behavior changed during ownership-handoff repair',
+  'time-normalized keyboard reversal is not more progressive than the legacy fixed-rack slew',
 );
 
 // Chassis/wheel coherence: a presentation-only pose change must preserve each
