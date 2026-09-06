@@ -1,13 +1,10 @@
 import * as THREE from 'three';
 import { Simulation } from '../.vendor/Racing26/src/physics/Simulation';
 import { PhysicsMath } from '../.vendor/Racing26/src/physics/math/PhysicsMath';
-import { DEFAULT_VEHICLE_CONFIG } from '../.vendor/Racing26/src/physics/vehiclePresets';
-import { BMW_M5_2025_OVERRIDES } from '../.vendor/Racing26/src/physics/m5G90';
+import { createRacerrhiM5Config } from './m5-config';
+import { racerrhiSurfaceMaterialForDistance } from './m5-surface-adapter';
 
-const config = {
-  ...DEFAULT_VEHICLE_CONFIG,
-  ...BMW_M5_2025_OVERRIDES,
-} as any;
+const config = createRacerrhiM5Config();
 
 const neutral = {
   throttle: 0,
@@ -113,19 +110,18 @@ const racerrhiSurfaceProvider = {
     ny /= normalLength;
     nz /= normalLength;
 
-    const onRoad = road.distance <= 7.7;
-    const onKerb = road.distance > 7.0 && road.distance <= 8.25;
+    const material = racerrhiSurfaceMaterialForDistance(road.distance);
 
     return {
       elevation: road.p.y,
       normal: PhysicsMath.vec3(nx, ny, nz),
       slopePitch: Math.atan2(dy, Math.sqrt(horizontalSq)),
       slopeRoll: 0,
-      type: onKerb ? 'kerb' : onRoad ? 'asphalt' : 'gravel',
-      friction: onKerb ? 0.88 : onRoad ? 1.0 : 0.55,
-      rollingResistance: onRoad ? 0.015 : 0.075,
+      type: material.type,
+      friction: material.friction,
+      rollingResistance: material.rollingResistance,
       wetness: 0,
-      isKerbRumble: onKerb,
+      isKerbRumble: material.isKerbRumble,
     };
   },
 };
