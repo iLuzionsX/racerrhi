@@ -109,7 +109,18 @@ const desktopCanvas = await assertRenderableCanvas(desktopPage);
 await desktopPage.click('#drive');
 await desktopPage.waitForFunction(() => !document.getElementById('hud')?.hidden);
 await desktopPage.waitForFunction(() => !document.getElementById('countdown')?.hidden, null, { timeout: 5000 });
-await desktopPage.waitForFunction(() => document.getElementById('countdown')?.hidden, null, { timeout: 30000 });
+try {
+  await desktopPage.waitForFunction(() => document.getElementById('countdown')?.hidden, null, { timeout: 10000 });
+} catch (error) {
+  const state = await desktopPage.evaluate(() => ({
+    countdownHidden: document.getElementById('countdown')?.hidden,
+    countdownText: document.getElementById('countdown')?.textContent,
+    speedText: document.getElementById('speed')?.textContent,
+    hudHidden: document.getElementById('hud')?.hidden,
+    visibilityState: document.visibilityState,
+  }));
+  throw new Error('countdown did not advance: ' + JSON.stringify({ state, errors: desktopErrors }));
+}
 await desktopPage.keyboard.down('ArrowUp');
 await desktopPage.keyboard.down('ArrowLeft');
 await desktopPage.waitForTimeout(1400);
