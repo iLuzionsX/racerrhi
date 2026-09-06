@@ -60,10 +60,12 @@ jobs:
           node test.mjs
       - name: Install browser smoke dependencies
         run: |
-          npm install --no-package-lock --no-save playwright@1.55.0 pngjs@7.0.0
+          npm install --no-package-lock --no-save playwright@1.55.0 puppeteer-core@25.10.0 pngjs@7.0.0
           npx playwright install --with-deps chromium
       - name: Verify real browser startup and controls
         run: xvfb-run -a node integration/browser-smoke.mjs
+      - name: Verify independent mobile multi-touch ownership
+        run: xvfb-run -a node integration/mobile-pointer-smoke.mjs
   deploy:
     needs: validate
     if: github.event_name != 'pull_request'
