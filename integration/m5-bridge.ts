@@ -1,7 +1,6 @@
 import { Simulation } from '../.vendor/Racing26/src/physics/Simulation';
 import { PhysicsMath } from '../.vendor/Racing26/src/physics/math/PhysicsMath';
 import type { VehicleState } from '../.vendor/Racing26/src/types';
-import { loadBundledM5Visual } from '../.vendor/Racing26/src/graphics/bundledM5Visual';
 import { racerrhiSteeringTargetForM5 } from './m5-steering-adapter';
 import { racerrhiSurfaceMaterialForDistance } from './m5-surface-adapter';
 import { createRacerrhiM5Config, RACERRHI_M5_REFERENCE_LOADS } from './m5-config';
@@ -657,6 +656,9 @@ export function getM5PhysicsMetadata() {
 }
 
 export async function loadM5Visual() {
+  const { loadBundledM5Visual } = await import(
+    '../.vendor/Racing26/src/graphics/bundledM5Visual'
+  );
   return loadBundledM5Visual(M5_CONFIG);
 }
 
