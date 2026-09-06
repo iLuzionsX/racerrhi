@@ -412,14 +412,30 @@ function steeringInputsForStep(sim: Simulation, input: M5ControlInput) {
     // Seed the incoming controller from the current effective command so a touch
     // takeover preserves steering continuity, then let the donor's analog slew
     // move toward the new hand position at its normal rate.
+    const mappedTouchTarget = racerrhiSteeringTargetForM5(
+      sim,
+      finite(input.analogSteerTarget)
+    );
     if (
       Math.abs(sim.analogSteeringInput) <= 1e-7 &&
       Math.abs(sim.digitalSteeringInput) > 1e-7
     ) {
-      sim.resetAnalogSteeringInput(sim.digitalSteeringInput);
+      const outgoingDigital = sim.digitalSteeringInput;
+      sim.resetAnalogSteeringInput(outgoingDigital);
+
+      // Opposite-direction ownership changes are explicitly two-stage. On the
+      // first touch-owned fixed step, unwind the outgoing keyboard request only
+      // toward center; do not let the donor's fast analog reversal cross center
+      // in one tick just because the high-speed digital envelope is small.
+      if (
+        mappedTouchTarget !== 0 &&
+        Math.sign(mappedTouchTarget) !== Math.sign(outgoingDigital)
+      ) {
+        return { analogSteerTarget: 0 };
+      }
     }
     return {
-      analogSteerTarget: racerrhiSteeringTargetForM5(sim, finite(input.analogSteerTarget)),
+      analogSteerTarget: mappedTouchTarget,
     };
   }
 
