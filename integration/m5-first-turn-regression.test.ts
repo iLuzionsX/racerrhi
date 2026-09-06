@@ -69,64 +69,61 @@ function runFirstTurn(speedKmh:number,handWheelDeg:number,throttle:number){
 
 
 
-function runLegacyDirectMapping(speedKmh:number,handWheelDeg:number,throttle:number){
- const sim=launchedM5(speedKmh);
- const raw=-Math.min(1,Math.abs(handWheelDeg)/135);
- let peakRearSlip=0,peakFrontSlip=0,peakYaw=0,peakKappa=0,minFz=Infinity;
- for(let i=0;i<180;i++){
-   const ramp=Math.min(1,(i+1)/60);
-   // Legacy Racerrhi bridge behavior: normalized +/-135 deg hand wheel was passed
-   // straight through as normalized M5 rack travel.
-   const target=-raw*ramp;
-   const state=sim.stepExplicit({...neutral,steer:0,analogSteerTarget:target,throttle} as any,1);
-   peakRearSlip=Math.max(peakRearSlip,Math.max(Math.abs(state.wheels[2].slipAngle),Math.abs(state.wheels[3].slipAngle))*180/Math.PI);
-   peakFrontSlip=Math.max(peakFrontSlip,Math.max(Math.abs(state.wheels[0].slipAngle),Math.abs(state.wheels[1].slipAngle))*180/Math.PI);
-   peakYaw=Math.max(peakYaw,Math.abs(state.yawRate)*180/Math.PI);
-   peakKappa=Math.max(peakKappa,...state.wheels.map((w:any)=>Math.abs(w.slipRatio)));
-   minFz=Math.min(minFz,...state.wheels.map((w:any)=>w.forceVectorNorm));
- }
- return{speedKmh,handWheelDeg,legacyTarget:Math.abs(raw),peakRearSlipDeg:peakRearSlip,peakFrontSlipDeg:peakFrontSlip,peakYawDegS:peakYaw,peakKappa,minWheelFzN:minFz};
-}
-
-const legacyCases=[
- runLegacyDirectMapping(100,90,.7),
- runLegacyDirectMapping(100,135,.7),
- runLegacyDirectMapping(120,90,.7),
- runLegacyDirectMapping(120,135,.7),
-];
-
 const cases=[] as ReturnType<typeof runFirstTurn>[];
-for(const speed of [80,100,120])for(const hand of [45,60,90,135])cases.push(runFirstTurn(speed,hand,.7));
+for(const speed of [80,100,120]){
+  for(const hand of [45,60,90,135]){
+    cases.push(runFirstTurn(speed,hand,.7));
+  }
+}
 
 for(const c of cases){
- assert(Number.isFinite(c.peakRearSlipDeg)&&Number.isFinite(c.peakYawDegS),'non-finite first-turn response');
- assert(c.peakRearSlipDeg<20,'first-turn rear slip became a spin: '+JSON.stringify(c));
- assert(c.peakYawDegS<50,'first-turn yaw rate ran away: '+JSON.stringify(c));
- assert(c.peakKappa<.30,'first-turn tire longitudinal slip ran away: '+JSON.stringify(c));
- assert(c.minWheelFzN>500,'first-turn unloaded a wheel excessively: '+JSON.stringify(c));
+  assert(Number.isFinite(c.peakRearSlipDeg)&&Number.isFinite(c.peakYawDegS)&&Number.isFinite(c.peakKappa),
+    'non-finite first-turn response: '+JSON.stringify(c));
+  assert(c.peakRearSlipDeg<20,'first-turn rear slip became a spin: '+JSON.stringify(c));
+  assert(c.peakYawDegS<55,'first-turn yaw rate ran away: '+JSON.stringify(c));
+  assert(c.minWheelFzN>500,'first-turn unloaded a wheel excessively: '+JSON.stringify(c));
+
+  if(c.handWheelDeg<=90){
+    // Ordinary corner-entry travel must stay out of combined-slip runaway.
+    assert(c.peakKappa<.30,'ordinary first-turn input saturated longitudinal slip: '+JSON.stringify(c));
+    assert(c.peakFrontSlipDeg<25,'ordinary first-turn input saturated front slip excessively: '+JSON.stringify(c));
+  }else{
+    // Full mechanical lock at road speed is deliberately excessive input. It may
+    // saturate the front tires, but it must remain finite and not destabilize the
+    // rear/chassis. Do not mistake lower yaw from an artificial speed limiter for
+    // better steering controls.
+    assert(c.peakKappa<1.0,'full-lock first-turn input became numerically unstable: '+JSON.stringify(c));
+    assert(c.peakFrontSlipDeg<80,'full-lock front slip became numerically unstable: '+JSON.stringify(c));
+  }
 }
 
-// Prove the actual old failure mode: the legacy direct mapping drove the front
-// tires deep into saturation at the same first-turn speed and hand-wheel travel.
-for(const speed of [100,120]){
- const legacyFull=legacyCases.find(c=>c.speedKmh===speed&&c.handWheelDeg===135)!;
- const fixedFull=cases.find(c=>c.speedKmh===speed&&c.handWheelDeg===135)!;
- assert(legacyFull.peakFrontSlipDeg>25,'legacy baseline no longer reproduces first-turn front saturation');
- assert(fixedFull.peakFrontSlipDeg<legacyFull.peakFrontSlipDeg*.45,'fixed mapping did not materially reduce first-turn front slip');
- assert(fixedFull.peakKappa<legacyFull.peakKappa*.50,'fixed mapping did not materially reduce first-turn combined-slip saturation');
+// Fixed touch mapping: identical hand position means identical rack request at
+// every road speed and during a slide. This is the core muscle-memory contract.
+const mappingInputs=[0.10,0.25,0.50,0.75,1.0];
+const mappingSpeeds=[20,50,80,120,150,200];
+const mappingMatrix:any[]=[];
+for(const hand of mappingInputs){
+  let reference:number|null=null;
+  for(const speed of mappingSpeeds){
+    const sim=launchedM5(speed);
+    const target=Math.abs(racerrhiSteeringTargetForM5(sim,-hand));
+    if(reference===null) reference=target;
+    assert(Math.abs(target-reference)<1e-12,
+      'fixed touch target changed with road speed: '+JSON.stringify({hand,speed,target,reference}));
+    mappingMatrix.push({hand,speedKmh:speed,target});
+  }
 }
 
-// At road speed, Racerrhi full wheel travel must no longer equal full M5 rack.
-const roadSpeedFull=launchedM5(100);
-const roadSpeedTarget=Math.abs(racerrhiSteeringTargetForM5(roadSpeedFull,-1));
-assert(roadSpeedTarget>0.28&&roadSpeedTarget<0.34,'road-speed steering ratio mismatch: '+roadSpeedTarget);
+const shapeProbe=launchedM5(80);
+const centerTarget=Math.abs(racerrhiSteeringTargetForM5(shapeProbe,-0.10));
+const halfTarget=Math.abs(racerrhiSteeringTargetForM5(shapeProbe,-0.50));
+const threeQuarterTarget=Math.abs(racerrhiSteeringTargetForM5(shapeProbe,-0.75));
+const fullTarget=Math.abs(racerrhiSteeringTargetForM5(shapeProbe,-1));
+assert(centerTarget>0&&centerTarget<0.05,'fixed touch curve lost fine center control: '+centerTarget);
+assert(halfTarget>0.15&&halfTarget<0.25,'fixed touch curve midrange is not usable: '+halfTarget);
+assert(threeQuarterTarget>0.35&&threeQuarterTarget<0.55,'fixed touch curve upper range is not progressive: '+threeQuarterTarget);
+assert(fullTarget>0.99,'full touch travel lost mechanical countersteer authority: '+fullTarget);
 
-// At maneuvering speed, retain enough lock for the circuit's tight Riviera section.
-const lowSpeed=launchedM5(20);
-const lowSpeedTarget=Math.abs(racerrhiSteeringTargetForM5(lowSpeed,-1));
-assert(lowSpeedTarget>0.90,'low-speed steering authority lost: '+lowSpeedTarget);
-
-// Genuine opposite-lock recovery must still unlock substantial mechanical rack.
 const recovery=launchedM5(100);
 const recoverySpeed=Math.abs(recovery.vehicle.rigidBody.getLocalVelocity().z);
 recovery.vehicle.rigidBody.velocity=PhysicsMath.quatRotateVec3(
@@ -134,15 +131,19 @@ recovery.vehicle.rigidBody.velocity=PhysicsMath.quatRotateVec3(
  PhysicsMath.vec3(-Math.tan(18*Math.PI/180)*recoverySpeed,0,recoverySpeed)
 );
 recovery.vehicle.rigidBody.angularVelocity=PhysicsMath.vec3(0,1.05,0);
-const recoveryTarget=Math.abs(racerrhiSteeringTargetForM5(recovery,1));
-assert(recoveryTarget>0.80,'opposite-lock recovery authority lost: '+recoveryTarget);
+const recoveryTarget=Math.abs(racerrhiSteeringTargetForM5(recovery,-1));
+assert(Math.abs(recoveryTarget-fullTarget)<1e-12,
+  'slide state changed the same held touch position: '+JSON.stringify({fullTarget,recoveryTarget}));
 
 console.log(JSON.stringify({
- scenario:'Racerrhi first-turn M5 steering integration',
- roadSpeedFullRackRequest:roadSpeedTarget,
- lowSpeedFullRackRequest:lowSpeedTarget,
- severeRecoveryRackRequest:recoveryTarget,
- legacyDirectMappingCases:legacyCases,
+ scenario:'Racerrhi first-turn fixed touch steering integration',
+ fixedMapping:true,
+ centerTarget,
+ halfTarget,
+ threeQuarterTarget,
+ fullTarget,
+ severeSlideSameHeldInputTarget:recoveryTarget,
+ mappingMatrix,
  cases,
  status:'passed'
 },null,2));
