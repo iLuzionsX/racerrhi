@@ -1,7 +1,7 @@
 name: Publish APEX to GitHub Pages
 on:
   push:
-    branches: [main, astra/physics-pipeline-repair, astra/progressive-tyre-recovery, astra/slide-recovery-unwind, astra/chassis-wheel-visual-sync]
+    branches: [main, astra/physics-pipeline-repair, astra/progressive-tyre-recovery, astra/slide-recovery-unwind, astra/chassis-wheel-visual-sync, astra/progressive-speed-steering]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -44,6 +44,8 @@ jobs:
         run: npx --yes tsx@4.20.6 integration/m5-racerrhi-recovery.test.ts
       - name: Validate uphill tire load timing and 119 km/h first corner
         run: npx --yes tsx@4.20.6 integration/m5-uphill-corner-regression.test.ts
+      - name: Validate progressive speed steering and high-speed release
+        run: npx --yes tsx@4.20.6 integration/m5-speed-steering-regression.test.ts
       - name: Validate Racerrhi first-turn steering
         run: npx --yes tsx@4.20.6 integration/m5-first-turn-regression.test.ts
       - name: Validate Racerrhi surface continuity
@@ -129,6 +131,7 @@ jobs:
             case "${GITHUB_REF_NAME}" in
               astra/progressive-tyre-recovery) PREVIEW_SLUG="pr-17" ;;
               astra/slide-recovery-unwind) PREVIEW_SLUG="slide-recovery-unwind" ;;
+              astra/progressive-speed-steering) PREVIEW_SLUG="progressive-speed-steering" ;;
               astra/chassis-wheel-visual-sync) PREVIEW_SLUG="chassis-wheel-visual-sync" ;;
               astra/physics-pipeline-repair) PREVIEW_SLUG="pr-16" ;;
               *) PREVIEW_SLUG="branch-preview" ;;
@@ -145,17 +148,18 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
       - name: Install deployed-preview browser smoke dependencies
-        if: github.ref_name == 'astra/slide-recovery-unwind'
+        if: github.ref_name == 'astra/slide-recovery-unwind' || github.ref_name == 'astra/progressive-speed-steering'
         run: |
           npm install --no-package-lock --no-save playwright@1.55.0 pngjs@7.0.0
           npx playwright install --with-deps chromium
       - name: Verify deployed public preview in real Chromium
-        if: github.ref_name == 'astra/slide-recovery-unwind'
+        if: github.ref_name == 'astra/slide-recovery-unwind' || github.ref_name == 'astra/progressive-speed-steering'
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
           EXPECTED_COMMIT: ${{ github.sha }}
         run: |
-          LIVE_URL="${PAGE_URL%/}/previews/slide-recovery-unwind/"
+          PREVIEW_SLUG="$(cat site/preview-slug.txt)"
+          LIVE_URL="${PAGE_URL%/}/previews/$PREVIEW_SLUG/"
           passed=0
           for attempt in 1 2 3; do
             if RACERRHI_SMOKE_URL="$LIVE_URL" \
