@@ -1,6 +1,13 @@
 export const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
-export const defaults=()=>({version:2,show:true,sensitivity:1,wheelSize:210,pedalSize:78,wheelX:.02,wheelY:.93,pedalX:.98,pedalY:.93,quality:'balanced',sound:false});
-export function sanitize(raw={}){raw=raw||{};const d=defaults();for(const k of ['wheelSize','pedalSize','wheelX','wheelY','pedalX','pedalY','sensitivity'])if(Number.isFinite(raw[k]))d[k]=raw[k];d.wheelSize=clamp(d.wheelSize,140,300);d.pedalSize=clamp(d.pedalSize,65,115);for(const k of ['wheelX','wheelY','pedalX','pedalY'])d[k]=clamp(d[k],0,1);d.sensitivity=clamp(d.sensitivity,.6,1.5);d.quality=raw.quality==='high'?'high':'balanced';d.show=raw.show!==false;d.sound=raw.sound===true;return d;}
+export const defaults=()=>({version:2,show:true,sensitivity:1,wheelMode:'drag',wheelSize:210,pedalSize:78,wheelX:.02,wheelY:.93,pedalX:.98,pedalY:.93,quality:'balanced',sound:false});
+export function sanitize(raw={}){raw=raw||{};const d=defaults();for(const k of ['wheelSize','pedalSize','wheelX','wheelY','pedalX','pedalY','sensitivity'])if(Number.isFinite(raw[k]))d[k]=raw[k];d.wheelSize=clamp(d.wheelSize,140,300);d.pedalSize=clamp(d.pedalSize,65,115);for(const k of ['wheelX','wheelY','pedalX','pedalY'])d[k]=clamp(d[k],0,1);d.sensitivity=clamp(d.sensitivity,.6,1.5);d.wheelMode=raw.wheelMode==='rotate'?'rotate':'drag';d.quality=raw.quality==='high'?'high':'balanced';d.show=raw.show!==false;d.sound=raw.sound===true;return d;}
 export function bounds(config,width,height){const safe=14,wheel=Math.min(config.wheelSize,width*.42,height*.60),pedal=Math.min(config.pedalSize,width*.19,height*.22);const place=(w,h,x,y)=>({x:safe+x*Math.max(0,width-w-safe*2),y:safe+y*Math.max(0,height-h-safe*2),width:w,height:h});return {wheel:place(wheel,wheel+16,config.wheelX,config.wheelY),pedals:place(pedal*2+24,pedal*1.7+12,config.pedalX,config.pedalY),pedal};}
 export function angleDelta(previous,next){return Math.atan2(Math.sin(next-previous),Math.cos(next-previous));}
 export function steerFromAngle(angle,sensitivity=1){return clamp(angle/(Math.PI*.75)*sensitivity,-1,1);}
+
+// Relative thumb travel: any grab point is valid and vertical motion is ignored.
+// Clamp each movement, not the cumulative drag origin, so reversing after full
+// lock responds immediately even if the finger travelled outside the control.
+export function thumbSteer(current,deltaX,width,sensitivity=1){
+  return clamp(current+deltaX/Math.max(1,width*.55)*sensitivity,-1,1);
+}

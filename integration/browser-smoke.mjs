@@ -238,7 +238,7 @@ await mobilePage.evaluate(() => {
 });
 
 const readUiState = () => mobilePage.evaluate(async () => {
-  const { input } = await import('./ui.js?v=4');
+  const { input } = await import('./ui.js?v=5');
   const wheel = document.getElementById('wheel');
   return {
     ...input,
@@ -366,16 +366,69 @@ async function activePedalPointerId(locator, id) {
 
 const mobileResults = {};
 
+async function gestureMove(points) {
+  await touch('touchMove', points);
+  await mobilePage.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+
+// Thumb drag works at the hub, ignores vertical drift, and reverses immediately
+// after overtravel. These are trusted touch events through the actual UI module.
+await touch('touchStart', [tp(cx, cy, 91)]);
+await activeWheelPointerId();
+const initialDrag = await readUiState();
+await gestureMove( [tp(cx + 18, cy, 91)]);
+const smallDrag = await readUiState();
+if (smallDrag.steer <= initialDrag.steer + 0.1 || smallDrag.steer > 0.3) {
+  throw new Error('small right thumb movement was not a proportional right input: ' + JSON.stringify(smallDrag));
+}
+await gestureMove( [tp(cx + 18, cy - 30, 91)]);
+const verticalDrag = await readUiState();
+if (Math.abs(verticalDrag.steer - smallDrag.steer) > 0.001) throw new Error('vertical thumb drift changed steering');
+const farX = canvasBox.width - 10;
+await gestureMove( [tp(farX, cy - 30, 91)]);
+if ((await readUiState()).steer < 0.999) throw new Error('thumb drag could not reach full lock');
+await gestureMove( [tp(farX - 5, cy - 30, 91)]);
+const unwind = await readUiState();
+if (unwind.steer >= 0.99 || unwind.steer < 0.85) throw new Error('overtravel delayed thumb countersteer');
+await gestureMove( [tp(cx, cy - 30, 91)]);
+if ((await readUiState()).steer > -0.99) throw new Error('continuous drag could not reach opposite lock');
+await touch('touchEnd');
+await visualRecenter('thumb drag release');
+await touch('touchStart', [tp(cx, cy, 92)]);
+const regrab = await readUiState();
+if (Math.abs(regrab.steer) > 0.05) throw new Error('center re-grab jumped steering');
+await touch('touchEnd');
+mobileResults.thumbDrag = { smallDrag, verticalDrag, unwind, regrab };
+
+// The saved rotary option remains usable, including crossing the wheel hub.
+async function selectWheelMode(mode) {
+  await mobilePage.click('#pause');
+  await mobilePage.click('#pause-settings');
+  await mobilePage.selectOption('#wheel-mode', mode);
+  await mobilePage.click('#close-settings');
+}
+await selectWheelMode('rotate');
+await touch('touchStart', [tp(wheelStartX, cy, 93)]);
+await gestureMove( [tp(cx, cy, 93)]);
+await gestureMove( [tp(cx, cy - wheelBox.height * 0.35, 93)]);
+if (Math.abs((await readUiState()).steer) > 0.001) throw new Error('rotary hub crossing jumped steering');
+await gestureMove( [tp(cx - wheelBox.width * 0.35, cy, 93)]);
+if (Math.abs((await readUiState()).steer) < 0.1) throw new Error('saved rotary gesture no longer steers');
+await touch('touchEnd');
+await selectWheelMode('drag');
+const savedMode = await mobilePage.evaluate(() => JSON.parse(localStorage.getItem('apex-controls-v2')).wheelMode);
+if (savedMode !== 'drag') throw new Error('wheel gesture setting did not persist');
+
 // Normal release: input ownership must clear immediately; visual recenter is tracked separately.
 await clearPointerTrace();
 await touch('touchStart', [wheelPoint(1)]);
-await waitUi(async () => (await import('./ui.js?v=4')).input.held === true, 'wheel did not enter held state');
+await waitUi(async () => (await import('./ui.js?v=5')).input.held === true, 'wheel did not enter held state');
 const normalPointerId = await activeWheelPointerId();
 await touch('touchMove', [wheelPoint(1, true)]);
-await waitUi(async () => Math.abs((await import('./ui.js?v=4')).input.steer) > 0.10, 'wheel move did not create steering request');
+await waitUi(async () => Math.abs((await import('./ui.js?v=5')).input.steer) > 0.10, 'wheel move did not create steering request');
 const normalBeforeRelease = await readUiState();
 await touch('touchEnd');
-await waitUi(async () => (await import('./ui.js?v=4')).input.held === false, 'normal wheel release left input held');
+await waitUi(async () => (await import('./ui.js?v=5')).input.held === false, 'normal wheel release left input held');
 const normalAfterRelease = await readUiState();
 const normalTrace = await readPointerTrace();
 const normalUp = normalTrace.find((entry) => entry.type === 'pointerup' && entry.pointerId === normalPointerId);
@@ -391,11 +444,11 @@ mobileResults.normalRelease = {
 // Release outside the wheel must still clear the captured steering owner.
 await clearPointerTrace();
 await touch('touchStart', [wheelPoint(2)]);
-await waitUi(async () => (await import('./ui.js?v=4')).input.held === true, 'outside-release wheel did not enter held state');
+await waitUi(async () => (await import('./ui.js?v=5')).input.held === true, 'outside-release wheel did not enter held state');
 const outsidePointerId = await activeWheelPointerId();
 await touch('touchMove', [tp(wheelOutsideX, wheelOutsideY, 2)]);
 await touch('touchEnd');
-await waitUi(async () => (await import('./ui.js?v=4')).input.held === false, 'release outside wheel left steering held');
+await waitUi(async () => (await import('./ui.js?v=5')).input.held === false, 'release outside wheel left steering held');
 const outsideTrace = await readPointerTrace();
 if (!outsideTrace.some((entry) => entry.type === 'pointerup' && entry.pointerId === outsidePointerId && entry.control === 'wheel')) {
   throw new Error('captured outside release was not delivered back to wheel: ' + JSON.stringify(outsideTrace));
@@ -410,12 +463,12 @@ mobileResults.outsideRelease = {
 // Cancellation may leave a decaying visual/request value, but it must release analog ownership.
 await clearPointerTrace();
 await touch('touchStart', [wheelPoint(3)]);
-await waitUi(async () => (await import('./ui.js?v=4')).input.held === true, 'cancel wheel did not enter held state');
+await waitUi(async () => (await import('./ui.js?v=5')).input.held === true, 'cancel wheel did not enter held state');
 const cancelPointerId = await activeWheelPointerId();
 await touch('touchMove', [wheelPoint(3, true)]);
-await waitUi(async () => Math.abs((await import('./ui.js?v=4')).input.steer) > 0.10, 'cancel setup did not create steering request');
+await waitUi(async () => Math.abs((await import('./ui.js?v=5')).input.steer) > 0.10, 'cancel setup did not create steering request');
 await touch('touchCancel');
-await waitUi(async () => (await import('./ui.js?v=4')).input.held === false, 'pointercancel left analog steering ownership held');
+await waitUi(async () => (await import('./ui.js?v=5')).input.held === false, 'pointercancel left analog steering ownership held');
 const cancelTrace = await readPointerTrace();
 if (!cancelTrace.some((entry) => entry.type === 'pointercancel' && entry.pointerId === cancelPointerId)) {
   throw new Error('trusted pointercancel was not observed for wheel: ' + JSON.stringify(cancelTrace));
@@ -430,14 +483,14 @@ mobileResults.cancel = {
 // Unexpected capture loss must be idempotent and release only the captured wheel owner.
 await clearPointerTrace();
 await touch('touchStart', [wheelPoint(4)]);
-await waitUi(async () => (await import('./ui.js?v=4')).input.held === true, 'capture-loss wheel did not enter held state');
+await waitUi(async () => (await import('./ui.js?v=5')).input.held === true, 'capture-loss wheel did not enter held state');
 const lostPointerId = await activeWheelPointerId();
 await touch('touchMove', [wheelPoint(4, true)]);
 await wheel.evaluate((el, pointerId) => el.releasePointerCapture(pointerId), lostPointerId);
 // Pointer capture changes are processed on the next pointer event. Use the still-active
 // trusted touch source to flush the pending loss instead of fabricating a DOM PointerEvent.
 await touch('touchMove', [tp(wheelOutsideX, wheelOutsideY, 4)]);
-await waitUi(async () => (await import('./ui.js?v=4')).input.held === false, 'lostpointercapture left analog steering ownership held');
+await waitUi(async () => (await import('./ui.js?v=5')).input.held === false, 'lostpointercapture left analog steering ownership held');
 const lostTraceBeforeEnd = await readPointerTrace();
 if (!lostTraceBeforeEnd.some((entry) => entry.type === 'lostpointercapture' && entry.pointerId === lostPointerId)) {
   throw new Error('browser did not emit lostpointercapture for released wheel capture: ' + JSON.stringify(lostTraceBeforeEnd));

@@ -75,3 +75,19 @@ For the tested 33.75-degree hand-wheel ramp, hold and release, peak sideslip fal
 from 17.8 to 8.3 degrees at 150 km/h and from 26.3 to 3.6 degrees at 200 km/h.
 These are deterministic simulation comparisons, not a guarantee against sliding
 with larger inputs or a claim of physical phone testing.
+
+## Thumb-controlled on-screen wheel
+
+The default wheel gesture is now a relative horizontal drag: grab anywhere on
+the wheel, slide left/right, and lift to center. Vertical drift does not steer;
+pointer capture keeps the gesture working outside the rim. Full ordinary travel
+takes 55% of the displayed wheel width in either direction at 100% sensitivity.
+Moving back from an overdrag immediately unwinds, with no accumulated dead travel.
+The wheel graphic turns up to 72 degrees either way so its center marker remains
+readable. Input is applied directly; the M5's existing steering slew is unchanged.
+
+Settings → Wheel gesture also offers Rotate wheel. Its center crossing re-anchors
+the gesture instead of jumping half a turn. Existing saved pedal positions, wheel
+size and sensitivity are retained. Browser regressions cover center grabs, small
+corrections, vertical drift, overdrag/reversal, release/re-grab, the saved rotary
+option, and independent pedal/steering pointer ownership.

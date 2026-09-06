@@ -1,7 +1,7 @@
 import * as T from 'three';
-import {clamp} from './controls.mjs';
+import {clamp} from './controls.mjs?v=2';
 import {M5_FIXED_DT,stepCar,newCar,advanceLap,setSurfaceSampler,resolveBoundaryContact,loadM5Visual,captureM5RenderSnapshot,interpolateM5RenderSnapshots,rebaseM5RenderSnapshotPose,createM5StepScheduler,resetM5StepScheduler,pauseM5StepScheduler,consumeM5FrameTime} from './physics.mjs?v=3';
-import {config,input as touchInput,clearInput,sessionVisible} from './ui.js?v=4';
+import {config,input as touchInput,clearInput,sessionVisible} from './ui.js?v=5';
 import {surfaces,foliage,furniture} from './visuals.js';
 import {chaseCameraProfile} from './chase-camera.mjs';
 import {bonnetCameraProfile} from './bonnet-camera.mjs';
