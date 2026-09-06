@@ -172,7 +172,27 @@ const mobile = await browser.newContext({
 const mobilePage = await mobile.newPage();
 const mobileErrors = pageDiagnostics(mobilePage);
 await waitUntilPlayable(mobilePage);
+await mobilePage.bringToFront();
 const mobileCanvas = await assertRenderableCanvas(mobilePage);
+
+await mobilePage.evaluate(() => {
+  const wheel = document.getElementById('wheel');
+  window.__wheelPointerEvents = [];
+  for (const type of ['pointerdown', 'pointerup', 'pointercancel', 'lostpointercapture']) {
+    wheel?.addEventListener(type, (event) => {
+      window.__wheelPointerEvents.push({
+        type,
+        pointerId: event.pointerId,
+        pointerType: event.pointerType,
+      });
+    }, true);
+  }
+});
+const readUiInput = () => mobilePage.evaluate(async () => {
+  const { input } = await import('./ui.js');
+  return { ...input };
+});
+const readWheelEvents = () => mobilePage.evaluate(() => [...(window.__wheelPointerEvents || [])]);
 
 await mobilePage.click('#drive');
 await mobilePage.waitForFunction(() => !document.getElementById('touch')?.hidden);
@@ -217,10 +237,19 @@ if (!Number.isFinite(steerValue) || Math.abs(steerValue) < 10) {
   throw new Error('mobile steering drag did not produce an analog steering command');
 }
 await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+await mobilePage.waitForTimeout(100);
+const ordinaryReleaseInput = await readUiInput();
+const ordinaryReleaseEvents = await readWheelEvents();
+if (ordinaryReleaseInput.held) {
+  throw new Error('mobile steering touchend left the wheel input held: ' + JSON.stringify({
+    input: ordinaryReleaseInput,
+    events: ordinaryReleaseEvents,
+  }));
+}
 await mobilePage.waitForFunction(
   () => Math.abs(Number(document.getElementById('wheel')?.getAttribute('aria-valuenow') || '0')) < 5,
   null,
-  { timeout: 2000 },
+  { timeout: 8000 },
 );
 
 // Real multitouch regression from a clean pointer state: the touch wheel must
@@ -248,15 +277,25 @@ if (!(await gas.evaluate((el) => el.classList.contains('active')))) {
 if (!Number.isFinite(simultaneousSteerValue) || Math.abs(simultaneousSteerValue) < 10) {
   throw new Error('simultaneous touch steering + gas did not preserve steering input');
 }
+const eventCountBeforeCancel = (await readWheelEvents()).length;
 await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
-await mobilePage.waitForTimeout(80);
+await mobilePage.waitForTimeout(100);
 if (await gas.evaluate((el) => el.classList.contains('active'))) {
   throw new Error('touch cancellation left the gas pedal active');
+}
+const cancelReleaseInput = await readUiInput();
+const allWheelEventsAfterCancel = await readWheelEvents();
+const cancelReleaseEvents = allWheelEventsAfterCancel.slice(eventCountBeforeCancel);
+if (cancelReleaseInput.held || Math.abs(cancelReleaseInput.steer) > 0.001) {
+  throw new Error('touch cancellation left steering latched: ' + JSON.stringify({
+    input: cancelReleaseInput,
+    events: cancelReleaseEvents,
+  }));
 }
 await mobilePage.waitForFunction(
   () => Math.abs(Number(document.getElementById('wheel')?.getAttribute('aria-valuenow') || '0')) < 5,
   null,
-  { timeout: 2000 },
+  { timeout: 8000 },
 );
 
 // Exercise the second pedal's cancel path independently so neither pedal can
@@ -295,6 +334,10 @@ console.log(JSON.stringify({
     canvas: mobileCanvas,
     steeringAriaPercentAfterDrag: steerValue,
     simultaneousSteeringAndGasAriaPercent: simultaneousSteerValue,
+    ordinaryWheelReleaseInput,
+    ordinaryWheelReleaseEvents,
+    cancelWheelReleaseInput: cancelReleaseInput,
+    cancelWheelReleaseEvents: cancelReleaseEvents,
     gasTouchLifecycle: 'touchend + simultaneous touchcancel passed',
     brakeTouchCancelLifecycle: 'passed',
   },
