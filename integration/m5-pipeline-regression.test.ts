@@ -168,6 +168,51 @@ function wheelSupportAlignment(turn:{state:any}) {
 const leftWheelSupport = wheelSupportAlignment(leftTurn);
 const rightWheelSupport = wheelSupportAlignment(rightTurn);
 
+// High-speed visual/physics transform probe: reproduce the reported 150+ km/h
+// cornering regime and measure wheel-center drift in the renderer's yaw-local frame.
+function highSpeedTurnProbe(direction:-1|1) {
+  const state:any = newCar(0,0,0);
+  setCarPose(state,0,0,0,160/3.6);
+  let peakRollRad = 0;
+  let peakYawRadS = 0;
+  let peakSlipRad = 0;
+  let maxLocalLateralDeviationM = 0;
+  let maxLocalLongitudinalDeviationM = 0;
+  const staticById:any = {
+    FL:{x:.842,z:1.367}, FR:{x:-.842,z:1.367},
+    RL:{x:.830,z:-1.638}, RR:{x:-.830,z:-1.638},
+  };
+
+  for(let i=0;i<240;i++) {
+    stepCar(state,{analogSteerTarget:direction*.16,analogSteerActive:true,throttle:.28},M5_FIXED_DT);
+    peakRollRad = Math.max(peakRollRad,Math.abs(state.physicalPose.rollRad));
+    peakYawRadS = Math.max(peakYawRadS,Math.abs(state.yawRate));
+    peakSlipRad = Math.max(peakSlipRad,Math.abs(state.slip));
+
+    const cy=Math.cos(state.physicalPose.yawRad), sy=Math.sin(state.physicalPose.yawRad);
+    for(const wheel of state.wheels) {
+      const nominal=staticById[wheel.id];
+      const dx=wheel.hubWorldPos.x-state.physicalPose.position.x;
+      const dz=wheel.hubWorldPos.z-state.physicalPose.position.z;
+      const localX=cy*dx-sy*dz;
+      const localZ=sy*dx+cy*dz;
+      maxLocalLateralDeviationM=Math.max(maxLocalLateralDeviationM,Math.abs(localX-nominal.x));
+      maxLocalLongitudinalDeviationM=Math.max(maxLocalLongitudinalDeviationM,Math.abs(localZ-nominal.z));
+    }
+  }
+
+  return {
+    peakRollRad,
+    peakYawRadS,
+    peakSlipRad,
+    maxLocalLateralDeviationM,
+    maxLocalLongitudinalDeviationM,
+    finalSpeedKmh:state.speed*3.6,
+  };
+}
+const highSpeedLeft=highSpeedTurnProbe(1);
+const highSpeedRight=highSpeedTurnProbe(-1);
+
 // -----------------------------------------------------------------------------
 // 3) Sustained corner -> lift -> brake -> throttle exit remains progressive.
 // -----------------------------------------------------------------------------
@@ -524,6 +569,25 @@ console.log(JSON.stringify({
     rightTurnDecoratedMigrationMm:rightWheelSupport.maxDecoratedMigrationM*1000,
     leftTurnBridgeSupportErrorMm:leftWheelSupport.maxBridgeSupportErrorM*1000,
     rightTurnBridgeSupportErrorMm:rightWheelSupport.maxBridgeSupportErrorM*1000,
+  },
+  highSpeedTurnProbe:{
+    left:{
+      peakRollDeg:highSpeedLeft.peakRollRad*180/Math.PI,
+      peakYawDegS:highSpeedLeft.peakYawRadS*180/Math.PI,
+      peakSideslipDeg:highSpeedLeft.peakSlipRad*180/Math.PI,
+      maxLocalLateralDeviationMm:highSpeedLeft.maxLocalLateralDeviationM*1000,
+      maxLocalLongitudinalDeviationMm:highSpeedLeft.maxLocalLongitudinalDeviationM*1000,
+      finalSpeedKmh:highSpeedLeft.finalSpeedKmh,
+    },
+    right:{
+      peakRollDeg:highSpeedRight.peakRollRad*180/Math.PI,
+      peakYawDegS:highSpeedRight.peakYawRadS*180/Math.PI,
+      peakSideslipDeg:highSpeedRight.peakSlipRad*180/Math.PI,
+      maxLocalLateralDeviationMm:highSpeedRight.maxLocalLateralDeviationM*1000,
+      maxLocalLongitudinalDeviationMm:highSpeedRight.maxLocalLongitudinalDeviationM*1000,
+      finalSpeedKmh:highSpeedRight.finalSpeedKmh,
+    },
+    renderRollClampDeg:.20*180/Math.PI,
   },
   drivePhases:drivePhases.map(phase=>({
     name:phase.name,
