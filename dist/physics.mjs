@@ -1,10 +1,20 @@
 export {
   M5_PHYSICS_SOURCE,
+  M5_FIXED_DT,
+  M5_MAX_CATCHUP_STEPS,
   setSurfaceSampler,
   newCar,
   stepCar,
+  resolveBoundaryContact,
   setCarPose,
+  refreshCarState,
+  captureM5RenderSnapshot,
+  interpolateM5RenderSnapshots,
+  createM5StepScheduler,
+  resetM5StepScheduler,
+  pauseM5StepScheduler,
+  consumeM5FrameTime,
   getM5PhysicsMetadata,
   loadM5Visual,
   advanceLap,
-} from './m5-runtime.js';
+} from './m5-runtime.js?v=2';
