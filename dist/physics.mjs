@@ -12,6 +12,7 @@ export {
   interpolateM5RenderSnapshots,
   createM5StepScheduler,
   resetM5StepScheduler,
+  pauseM5StepScheduler,
   consumeM5FrameTime,
   getM5PhysicsMetadata,
   loadM5Visual,
