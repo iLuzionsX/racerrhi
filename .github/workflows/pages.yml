@@ -57,7 +57,7 @@ jobs:
           npm install --no-package-lock --no-save playwright@1.55.0 pngjs@7.0.0
           npx playwright install --with-deps chromium
       - name: Verify real browser startup and controls
-        run: node integration/browser-smoke.mjs
+        run: xvfb-run -a node integration/browser-smoke.mjs
   deploy:
     needs: validate
     if: github.event_name != 'pull_request'
