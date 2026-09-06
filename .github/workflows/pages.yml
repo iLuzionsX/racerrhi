@@ -54,7 +54,7 @@ jobs:
     needs: validate
     if: github.event_name != 'pull_request'
     environment:
-      name: github-pages
+      name: ${{ github.ref_name == 'main' && 'github-pages' || 'racerrhi-physics-preview' }}
       url: ${{ steps.deployment.outputs.page_url }}
     permissions:
       contents: read
