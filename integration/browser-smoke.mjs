@@ -108,7 +108,8 @@ const desktopCanvas = await assertRenderableCanvas(desktopPage);
 
 await desktopPage.click('#drive');
 await desktopPage.waitForFunction(() => !document.getElementById('hud')?.hidden);
-await desktopPage.waitForTimeout(3300);
+await desktopPage.waitForFunction(() => !document.getElementById('countdown')?.hidden, null, { timeout: 5000 });
+await desktopPage.waitForFunction(() => document.getElementById('countdown')?.hidden, null, { timeout: 30000 });
 await desktopPage.keyboard.down('ArrowUp');
 await desktopPage.keyboard.down('ArrowLeft');
 await desktopPage.waitForTimeout(1400);
