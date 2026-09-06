@@ -46,6 +46,8 @@ const browser = await puppeteer.launch({
   executablePath: chromium.executablePath(),
   headless: false,
   args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
     '--enable-webgl',
     '--ignore-gpu-blocklist',
     '--use-gl=angle',
