@@ -58,3 +58,36 @@ about 89 degrees peak sideslip, with the slide beginning on asphalt before any
 barrier contact. After: 1.93–2.86 degrees, no barrier contact or crash-stabilizer
 intervention. The flattened-track control is unchanged at 2.14 degrees.
 This is a deterministic driver regression, not physical iPhone testing.
+
+## Progressive high-speed touch steering
+
+The touch-wheel mapping keeps its existing response through 100 km/h. Above
+that, ordinary full-travel rack demand eases from 30% at 100 km/h to 23.2% at
+150 km/h, 13.3% at 200 km/h and 12% at 220 km/h. A mild cubic input curve also
+adds precision near center at high speed without a deadzone. Genuine opposite
+lock still unlocks the full rack and removes the extra input shaping. Keyboard
+steering, input handoff, tire forces, suspension and rendering remain unchanged.
+
+`node --import tsx integration/m5-speed-steering-regression.test.ts` sweeps forward
+and reverse speeds, checks symmetry and continuous gain, verifies severe recovery
+authority, and drives left/right 150 and 200 km/h corrections through the bridge.
+For the tested 33.75-degree hand-wheel ramp, hold and release, peak sideslip falls
+from 17.8 to 8.3 degrees at 150 km/h and from 26.3 to 3.6 degrees at 200 km/h.
+These are deterministic simulation comparisons, not a guarantee against sliding
+with larger inputs or a claim of physical phone testing.
+
+## Thumb-controlled on-screen wheel
+
+The default wheel gesture is now a relative horizontal drag: grab anywhere on
+the wheel, slide left/right, and lift to center. Vertical drift does not steer;
+pointer capture keeps the gesture working outside the rim. Full ordinary travel
+takes 55% of the displayed wheel width in either direction at 100% sensitivity.
+Moving back from an overdrag immediately unwinds, with no accumulated dead travel.
+The wheel graphic turns up to 72 degrees either way so its center marker remains
+readable. Input is applied directly; the M5's existing steering slew is unchanged.
+
+Settings → Wheel gesture also offers Rotate wheel. Its center crossing re-anchors
+the gesture instead of jumping half a turn. Existing saved pedal positions, wheel
+size and sensitivity are retained. Browser regressions cover center grabs, small
+corrections, vertical drift, overdrag/reversal, release/re-grab, the saved rotary
+option, and independent pedal/steering pointer ownership.

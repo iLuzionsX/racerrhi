@@ -30,10 +30,14 @@ export function racerrhiSteeringTargetForM5(sim: Simulation, racerrhiSteer: numb
       ? Math.atan2(localVelocity.x, Math.max(0.5, Math.abs(localVelocity.z)))
       : 0;
 
-  // Preserve tight maneuvering/hairpin authority below ~32 km/h. By ~68 km/h,
-  // use the road-car-like 900-degree hand-wheel/rack relationship.
+  // Preserve the proven parking/corner-entry mapping and recovery calibration.
+  const speedKmh = speedMs * 3.6;
   const roadSpeedBlend = smoothstep01((speedMs - 9) / 10);
   let scale = PhysicsMath.lerp(1.0, ROAD_SPEED_HAND_TO_RACK_SCALE, roadSpeedBlend);
+  // Above 100 km/h continue reducing sensitivity instead of holding the same
+  // ratio all the way to top speed. Zero endpoint slopes avoid a gain step.
+  const highSpeedBlend = smoothstep01((speedKmh - 100) / 120);
+  scale = PhysicsMath.lerp(scale, 0.12, highSpeedBlend);
 
   // Severe opposite-lock recovery may temporarily unlock more rack authority.
   const direction = Math.sign(physicalDirectionTarget) as -1 | 1;
@@ -46,5 +50,14 @@ export function racerrhiSteeringTargetForM5(sim: Simulation, racerrhiSteer: numb
   });
   scale = PhysicsMath.lerp(scale, 1.0, recoveryBlend);
 
-  return PhysicsMath.clamp(physicalDirectionTarget * scale, -1, 1);
+  // A mild cubic curve gives small hand corrections more resolution without a
+  // deadzone or sacrificing endpoint lock. Fade it out for opposite-lock catches;
+  // retain the donor's existing slew/release timing and ownership handoff.
+  const precisionBlend = 0.25 * highSpeedBlend * (1 - recoveryBlend);
+  const shapedTarget = PhysicsMath.lerp(
+    physicalDirectionTarget,
+    physicalDirectionTarget ** 3,
+    precisionBlend
+  );
+  return PhysicsMath.clamp(shapedTarget * scale, -1, 1);
 }
