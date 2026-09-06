@@ -366,6 +366,17 @@ export function newCar(x: number, z: number, heading: number): M5CarState {
 function steeringInputsForStep(sim: Simulation, input: M5ControlInput) {
   const analogOwnsSteering = Boolean(input.analogSteerActive);
   if (analogOwnsSteering) {
+    // Racing26 correctly clears digital state whenever analog input is supplied,
+    // but an ownership change would otherwise start analogSteeringInput from zero.
+    // Seed the incoming controller from the current effective command so a touch
+    // takeover preserves steering continuity, then let the donor's analog slew
+    // move toward the new hand position at its normal rate.
+    if (
+      Math.abs(sim.analogSteeringInput) <= 1e-7 &&
+      Math.abs(sim.digitalSteeringInput) > 1e-7
+    ) {
+      sim.resetAnalogSteeringInput(sim.digitalSteeringInput);
+    }
     return {
       analogSteerTarget: racerrhiSteeringTargetForM5(sim, finite(input.analogSteerTarget)),
     };
@@ -374,7 +385,18 @@ function steeringInputsForStep(sim: Simulation, input: M5ControlInput) {
   const direction = input.digitalSteerDirection;
   if (direction === -1 || direction === 0 || direction === 1) {
     if (direction === 0 && Math.abs(sim.analogSteeringInput) > 1e-5) {
+      // Releasing the touch wheel with no key held stays on the donor's analog
+      // return-to-center path instead of teleporting through a controller swap.
       return { analogSteerTarget: 0 };
+    }
+    if (
+      direction !== 0 &&
+      Math.abs(sim.digitalSteeringInput) <= 1e-7 &&
+      Math.abs(sim.analogSteeringInput) > 1e-7
+    ) {
+      // Symmetric handoff back to keyboard. Digital steering keeps its own
+      // speed envelope and fast countersteer/reversal rates after this seed.
+      sim.resetDigitalSteeringInput(sim.analogSteeringInput);
     }
     return { digitalSteerDirection: direction };
   }
@@ -564,6 +586,62 @@ export function interpolateM5RenderSnapshots(
           z: PhysicsMath.lerp(prior.hubWorldPos.z, wheel.hubWorldPos.z, t),
         },
         contactState: t < 0.5 ? prior.contactState : wheel.contactState,
+      };
+    }),
+  };
+}
+
+/**
+ * Reposition a render snapshot without touching physics history.
+ *
+ * Intro/cinematic and return-to-menu paths are presentation-only. They may move
+ * the chassis to a staged track pose, but wheel hubs are world-space physics
+ * coordinates. Rebase those hubs through chassis-local space so the complete car
+ * moves coherently instead of leaving four stale wheels behind at the old pose.
+ */
+export function rebaseM5RenderSnapshotPose(
+  snapshot: M5RenderSnapshot,
+  pose: {
+    x: number;
+    y: number;
+    z: number;
+    yawRad: number;
+    pitchRad?: number;
+    rollRad?: number;
+    speedMs?: number;
+  }
+): M5RenderSnapshot {
+  const sourceYaw = finite(snapshot.yawRad);
+  const targetYaw = finite(pose.yawRad, sourceYaw);
+  const sourceCos = Math.cos(sourceYaw);
+  const sourceSin = Math.sin(sourceYaw);
+  const targetCos = Math.cos(targetYaw);
+  const targetSin = Math.sin(targetYaw);
+  const targetX = finite(pose.x, snapshot.x);
+  const targetY = finite(pose.y, snapshot.y);
+  const targetZ = finite(pose.z, snapshot.z);
+
+  return {
+    ...snapshot,
+    x: targetX,
+    y: targetY,
+    z: targetZ,
+    yawRad: targetYaw,
+    pitchRad: finite(pose.pitchRad, snapshot.pitchRad),
+    rollRad: finite(pose.rollRad, snapshot.rollRad),
+    speedMs: finite(pose.speedMs, snapshot.speedMs),
+    wheels: snapshot.wheels.map((wheel) => {
+      const dx = wheel.hubWorldPos.x - snapshot.x;
+      const dz = wheel.hubWorldPos.z - snapshot.z;
+      const localX = sourceCos * dx - sourceSin * dz;
+      const localZ = sourceSin * dx + sourceCos * dz;
+      return {
+        ...wheel,
+        hubWorldPos: {
+          x: targetX + targetCos * localX + targetSin * localZ,
+          y: targetY + (wheel.hubWorldPos.y - snapshot.y),
+          z: targetZ - targetSin * localX + targetCos * localZ,
+        },
       };
     }),
   };
