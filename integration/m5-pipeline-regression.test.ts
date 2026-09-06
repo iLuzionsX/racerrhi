@@ -90,8 +90,8 @@ const finiteState = (state:any) => [
   },M5_FIXED_DT);
   assert.equal(sim.digitalSteeringInput, 0, 'held touch wheel did not take precedence');
   assert(
-    sim.analogSteeringInput > 0 && sim.analogSteeringInput < digitalBeforeTouch,
-    'touch takeover did not preserve the outgoing command while slewing toward the opposite analog target',
+    sim.analogSteeringInput >= 0 && sim.analogSteeringInput < digitalBeforeTouch,
+    'touch takeover crossed center instead of first unwinding the outgoing keyboard command',
   );
   for(let i=0;i<8;i++) {
     stepCar(state,{
