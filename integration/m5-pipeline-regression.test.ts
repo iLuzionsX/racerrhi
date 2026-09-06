@@ -180,6 +180,7 @@ let boundaryReport:any;
   assert.equal(state.boundaryContact.simulationStepCount, stepCountBefore);
   assert(state.boundaryContact.outwardSpeedBeforeMs > 0);
   assert(state.boundaryContact.outwardSpeedAfterMs <= 0);
+  const firstContactTelemetry = { ...state.boundaryContact };
 
   const repeatedBefore = PhysicsMath.vec3Dot(sim.vehicle.rigidBody.velocity, sim.vehicle.rigidBody.velocity);
   resolveBoundaryContact(state,{
@@ -202,8 +203,8 @@ let boundaryReport:any;
     fixedStepCountAfterContact: state.boundaryContact.simulationStepCount,
     speedMsBeforeContact: Math.sqrt(speedSqBefore),
     speedMsAfterContact: Math.sqrt(speedSqAfter),
-    outwardSpeedBeforeMs: state.boundaryContact.outwardSpeedBeforeMs,
-    outwardSpeedAfterMs: state.boundaryContact.outwardSpeedAfterMs,
+    outwardSpeedBeforeMs: firstContactTelemetry.outwardSpeedBeforeMs,
+    outwardSpeedAfterMs: firstContactTelemetry.outwardSpeedAfterMs,
   };
 }
 
