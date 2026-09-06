@@ -1,7 +1,7 @@
 diff --git a/src/physics/TireModel.ts b/src/physics/TireModel.ts
 --- a/src/physics/TireModel.ts
 +++ b/src/physics/TireModel.ts
-@@ -197,11 +197,24 @@ export class TireModel {
+@@ -197,13 +197,27 @@ export class TireModel {
      const slipSeverity = Math.max(longSeverity, latSeverity);
      const slideBlendLinear = PhysicsMath.clamp((slipSeverity - 1.15) / 2.35, 0, 1);
      const slideBlend = slideBlendLinear * slideBlendLinear * (3 - 2 * slideBlendLinear);
