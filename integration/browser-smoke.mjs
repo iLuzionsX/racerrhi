@@ -69,7 +69,7 @@ async function assertRenderableCanvas(page) {
   await canvas.waitFor({ state: 'visible' });
   const box = await canvas.boundingBox();
   if (!box || box.width < 300 || box.height < 200) {
-    throw new Error('WebGL canvas did not occupy a playable viewport');
+    throw new Error('WebGL canvas did not occupy the CI playability viewport');
   }
 
   const pngBuffer = await canvas.screenshot();
@@ -103,7 +103,7 @@ async function waitUntilPlayable(page) {
   }, null, { timeout: 20_000 });
 }
 
-const desktop = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+const desktop = await browser.newContext({ viewport: { width: 480, height: 270 }, deviceScaleFactor: 1 });
 const desktopPage = await desktop.newPage();
 const desktopErrors = pageDiagnostics(desktopPage);
 await waitUntilPlayable(desktopPage);
@@ -140,10 +140,10 @@ if (!(desktopSpeed > 0)) throw new Error('keyboard throttle did not move the car
 if (desktopErrors.length) throw new Error('desktop startup errors: ' + desktopErrors.join(' | '));
 
 const mobile = await browser.newContext({
-  viewport: { width: 390, height: 844 },
+  viewport: { width: 390, height: 640 },
   isMobile: true,
   hasTouch: true,
-  deviceScaleFactor: 2,
+  deviceScaleFactor: 1,
 });
 const mobilePage = await mobile.newPage();
 const mobileErrors = pageDiagnostics(mobilePage);
