@@ -1,7 +1,7 @@
 diff --git a/src/physics/TireModel.ts b/src/physics/TireModel.ts
 --- a/src/physics/TireModel.ts
 +++ b/src/physics/TireModel.ts
-@@ -197,13 +197,30 @@ export class TireModel {
+@@ -197,13 +197,31 @@ export class TireModel {
      const slipSeverity = Math.max(longSeverity, latSeverity);
      const slideBlendLinear = PhysicsMath.clamp((slipSeverity - 1.15) / 2.35, 0, 1);
      const slideBlend = slideBlendLinear * slideBlendLinear * (3 - 2 * slideBlendLinear);
@@ -25,8 +25,9 @@ diff --git a/src/physics/TireModel.ts b/src/physics/TireModel.ts
 +    //
 +    // Phase the adhesion weighting out only when both longitudinal and lateral slip
 +    // are simultaneously beyond the peak. This leaves one-axis steering-reversal
-+    // transients on their established response while correcting true combined sliding. The existing slideScale and superellipse still set the
-+    // available kinetic-friction magnitude, while pure braking, ordinary cornering,
++    // transients on their established response while correcting true combined sliding.
++    // The existing slideScale and superellipse still set the available kinetic-friction
++    // magnitude, while pure braking, ordinary cornering,
 +    // and the onset of combined slip retain the donor curves unchanged.
 +    const slidingGXAlpha = PhysicsMath.lerp(gXAlpha, 1.0, combinedSlideBlend);
 +    const slidingGYKappa = PhysicsMath.lerp(gYKappa, 1.0, combinedSlideBlend);
