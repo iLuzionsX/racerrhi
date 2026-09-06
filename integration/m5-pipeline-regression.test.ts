@@ -89,7 +89,19 @@ const finiteState = (state:any) => [
     throttle:.1,
   },M5_FIXED_DT);
   assert.equal(sim.digitalSteeringInput, 0, 'held touch wheel did not take precedence');
-  assert(sim.analogSteeringInput < 0, 'Racerrhi touch sign was not converted to Racing26 +left convention');
+  assert(
+    sim.analogSteeringInput > 0 && sim.analogSteeringInput < digitalBeforeTouch,
+    'touch takeover did not preserve the outgoing command while slewing toward the opposite analog target',
+  );
+  for(let i=0;i<8;i++) {
+    stepCar(state,{
+      digitalSteerDirection:1,
+      analogSteerTarget:.5,
+      analogSteerActive:true,
+      throttle:.1,
+    },M5_FIXED_DT);
+  }
+  assert(sim.analogSteeringInput < 0, 'Racerrhi touch sign was not converted to Racing26 +left convention after rate-limited handoff');
   assert(digitalBeforeTouch > 0);
 
   const analogBeforeRelease = Math.abs(sim.analogSteeringInput);
