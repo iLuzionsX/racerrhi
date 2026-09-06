@@ -263,3 +263,122 @@ for (const result of results) {
     }
   }
 }
+
+
+const findCase = (speedKmh: number, slide: string, brakeInput: number) => {
+  const match = results.find(
+    (result) =>
+      result.speedKmh === speedKmh &&
+      result.slide === slide &&
+      Math.abs(result.brakeInput - brakeInput) < 1e-9
+  );
+  assert(match, `missing ${speedKmh} km/h ${slide} brake=${brakeInput} case`);
+  return match;
+};
+
+// Frozen from current-main (4d4f794) before the deep-slide friction correction.
+// These values document the reproduced defect: increasing brake demand could
+// reduce gross-slide force utilization and make a sideways stop substantially longer.
+const reproducedBaseline = {
+  large80: {
+    partialStopDistanceM: 75.0,
+    fullStopDistanceM: 112.1,
+    partialMeanSlideUtilization: 0.469,
+    fullMeanSlideUtilization: 0.361,
+  },
+  large110: {
+    partialStopDistanceM: 137.2,
+    fullStoppedWithin8s: false,
+    fullSpeedAfter8sKmh: 40.8,
+    partialMeanSlideUtilization: 0.561,
+    fullMeanSlideUtilization: 0.352,
+  },
+};
+
+for (const speedKmh of [60, 80, 110]) {
+  const modestPartial = findCase(speedKmh, 'modest', 0.35);
+  const modestFull = findCase(speedKmh, 'modest', 1.0);
+  assert(
+    modestFull.meanDecelFirstSecondMs2 > modestPartial.meanDecelFirstSecondMs2,
+    `${speedKmh} km/h modest slide lost progressive brake response`,
+  );
+  assert(
+    modestFull.stopDistanceM !== null &&
+      modestPartial.stopDistanceM !== null &&
+      modestFull.stopDistanceM < modestPartial.stopDistanceM,
+    `${speedKmh} km/h modest slide full braking no longer stops shorter than partial braking`,
+  );
+
+  const largePartial = findCase(speedKmh, 'large', 0.35);
+  const largeFull = findCase(speedKmh, 'large', 1.0);
+  assert(
+    largePartial.stopDistanceM !== null && largeFull.stopDistanceM !== null,
+    `${speedKmh} km/h large slide failed to dissipate enough energy to reach a stop`,
+  );
+  assert(
+    largeFull.stopDistanceM <= largePartial.stopDistanceM * 1.05,
+    `${speedKmh} km/h full braking became materially worse than partial braking in a large slide`,
+  );
+  assert(
+    largeFull.grossSlide.meanUtilization >= 0.78,
+    `${speedKmh} km/h full-brake gross-slide tire utilization fell back toward the ice-like baseline`,
+  );
+  assert(
+    largeFull.grossSlide.minimumForceVsSlipAlignment >= 0.65,
+    `${speedKmh} km/h large-slide tire force stopped opposing contact-patch motion`,
+  );
+}
+
+const large80Partial = findCase(80, 'large', 0.35);
+const large80Full = findCase(80, 'large', 1.0);
+assert(
+  large80Partial.stopDistanceM <= reproducedBaseline.large80.partialStopDistanceM * 0.80,
+  '80 km/h partial-brake large-slide stopping distance did not improve enough',
+);
+assert(
+  large80Full.stopDistanceM <= reproducedBaseline.large80.fullStopDistanceM * 0.55,
+  '80 km/h full-brake large-slide stopping distance did not improve enough',
+);
+assert(
+  large80Full.grossSlide.meanUtilization >=
+    reproducedBaseline.large80.fullMeanSlideUtilization + 0.40,
+  '80 km/h full-brake gross-slide utilization did not recover from the reproduced collapse',
+);
+
+const large110Full = findCase(110, 'large', 1.0);
+assert(
+  large110Full.stopDistanceM !== null && large110Full.stopDistanceM < 105,
+  '110 km/h full-brake large slide still behaves like the reproduced eight-second ice slide',
+);
+assert(
+  large110Full.grossSlide.meanUtilization >=
+    reproducedBaseline.large110.fullMeanSlideUtilization + 0.40,
+  '110 km/h full-brake gross-slide utilization did not recover from the reproduced collapse',
+);
+
+console.log(JSON.stringify({
+  beforeAfter: {
+    large80: {
+      before: reproducedBaseline.large80,
+      after: {
+        partialStopDistanceM: large80Partial.stopDistanceM,
+        fullStopDistanceM: large80Full.stopDistanceM,
+        partialMeanSlideUtilization: large80Partial.grossSlide.meanUtilization,
+        fullMeanSlideUtilization: large80Full.grossSlide.meanUtilization,
+        partialPeakSideslipDeg: large80Partial.peakSideslipDeg,
+        fullPeakSideslipDeg: large80Full.peakSideslipDeg,
+        partialPeakYawDegS: large80Partial.peakYawDegS,
+        fullPeakYawDegS: large80Full.peakYawDegS,
+      },
+    },
+    large110: {
+      before: reproducedBaseline.large110,
+      after: {
+        fullStopDistanceM: large110Full.stopDistanceM,
+        fullMeanSlideUtilization: large110Full.grossSlide.meanUtilization,
+        fullPeakSideslipDeg: large110Full.peakSideslipDeg,
+        fullPeakYawDegS: large110Full.peakYawDegS,
+      },
+    },
+  },
+}, null, 2));
