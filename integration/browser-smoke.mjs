@@ -215,6 +215,68 @@ await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }
 if (!Number.isFinite(steerValue) || Math.abs(steerValue) < 10) {
   throw new Error('mobile steering drag did not produce an analog steering command');
 }
+
+// Real multitouch regression: the touch wheel must keep steering while a pedal
+// is held, and a browser/OS cancellation must release both controls cleanly.
+await mobilePage.waitForFunction(
+  () => Math.abs(Number(document.getElementById('wheel')?.getAttribute('aria-valuenow') || '0')) < 5,
+  null,
+  { timeout: 2000 },
+);
+await cdp.send('Input.dispatchTouchEvent', {
+  type: 'touchStart',
+  touchPoints: [
+    touchPoint(wheelStartX, cy, 81),
+    touchPoint(gx, gy, 82),
+  ],
+});
+await cdp.send('Input.dispatchTouchEvent', {
+  type: 'touchMove',
+  touchPoints: [
+    touchPoint(cx, wheelEndY, 81),
+    touchPoint(gx, gy, 82),
+  ],
+});
+await mobilePage.waitForTimeout(100);
+const simultaneousSteerValue = Number(await wheel.getAttribute('aria-valuenow'));
+if (!(await gas.evaluate((el) => el.classList.contains('active')))) {
+  throw new Error('simultaneous touch steering + gas did not keep the gas pedal active');
+}
+if (!Number.isFinite(simultaneousSteerValue) || Math.abs(simultaneousSteerValue) < 10) {
+  throw new Error('simultaneous touch steering + gas did not preserve steering input');
+}
+await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+await mobilePage.waitForTimeout(80);
+if (await gas.evaluate((el) => el.classList.contains('active'))) {
+  throw new Error('touch cancellation left the gas pedal active');
+}
+await mobilePage.waitForFunction(
+  () => Math.abs(Number(document.getElementById('wheel')?.getAttribute('aria-valuenow') || '0')) < 5,
+  null,
+  { timeout: 2000 },
+);
+
+// Exercise the second pedal's cancel path independently so neither pedal can
+// remain latched after an interrupted mobile gesture.
+const brake = mobilePage.locator('#brake');
+const brakeBox = await brake.boundingBox();
+if (!brakeBox) throw new Error('mobile brake pedal has no layout box');
+const bx = brakeBox.x + brakeBox.width / 2;
+const by = brakeBox.y + brakeBox.height / 2;
+await cdp.send('Input.dispatchTouchEvent', {
+  type: 'touchStart',
+  touchPoints: [touchPoint(bx, by, 83)],
+});
+await mobilePage.waitForTimeout(60);
+if (!(await brake.evaluate((el) => el.classList.contains('active')))) {
+  throw new Error('mobile brake touchstart did not engage the control');
+}
+await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+await mobilePage.waitForTimeout(80);
+if (await brake.evaluate((el) => el.classList.contains('active'))) {
+  throw new Error('touch cancellation left the brake pedal active');
+}
+
 if (mobileErrors.length) throw new Error('mobile startup errors: ' + mobileErrors.join(' | '));
 
 console.log(JSON.stringify({
@@ -229,7 +291,9 @@ console.log(JSON.stringify({
   mobile: {
     canvas: mobileCanvas,
     steeringAriaPercentAfterDrag: steerValue,
-    gasTouchLifecycle: 'passed',
+    simultaneousSteeringAndGasAriaPercent: simultaneousSteerValue,
+    gasTouchLifecycle: 'touchend + simultaneous touchcancel passed',
+    brakeTouchCancelLifecycle: 'passed',
   },
   errors: [],
   status: 'passed',
