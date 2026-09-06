@@ -137,12 +137,12 @@ const results = {
   neutral: run('neutral'),
   keyboardCorrect: run('keyboard-correct'),
   keyboardIncorrect: run('keyboard-incorrect'),
-  touchQuarter: run('touch-quarter'),
-  touchThird: run('touch-third'),
-  touchHalf: run('touch-half'),
-  touchFull: run('touch-full'),
+  touchQuarterDiagnostic: run('touch-quarter'),
+  touchCorrect: run('touch-third'),
+  touchHalfDiagnostic: run('touch-half'),
+  touchExcessive: run('touch-full'),
   keyboardCorrectAidsOff: run('keyboard-correct', true),
-  touchQuarterAidsOff: run('touch-quarter', true),
+  touchCorrectAidsOff: run('touch-third', true),
 };
 
 console.log(JSON.stringify({
@@ -156,10 +156,48 @@ console.log(JSON.stringify({
   results,
 }, null, 2));
 
-// Keep only invariants established before examining this richer trace. Once the
-// neutral/wrong/touch/aids-off measurements are visible in CI, the final pass
-// replaces these broad checks with behavior-specific comparative limits.
-assert(results.keyboardCorrect.bestErrorRatio < 0.35, 'keyboard countersteer did not materially reduce slide error');
-assert(results.keyboardCorrect.finalSlipDeg < 0.5, 'keyboard recovery left excessive final sideslip');
-assert(results.keyboardCorrect.absInterventionSteps === 0, 'ABS unexpectedly drove a steering-only recovery');
-assert(results.touchQuarter.absInterventionSteps === 0, 'ABS unexpectedly drove touch steering recovery');
+// Behavior-specific acceptance limits are pinned to the measured baseline above.
+// They distinguish useful driver control from mere eventual stabilization.
+assert.equal(results.neutral.halfErrorMs, null, 'neutral steering unexpectedly halved the disturbance error');
+assert(results.neutral.bestErrorRatio > 0.80, 'neutral steering now recovers too strongly to remain a useful control case');
+assert(results.neutral.finalSlipDeg > 2.0, 'neutral case unexpectedly self-corrected to a tiny final slip');
+
+assert(results.keyboardCorrect.halfErrorMs !== null && results.keyboardCorrect.halfErrorMs <= 500,
+  'correct keyboard countersteer is no longer prompt enough');
+assert(results.keyboardCorrect.quarterErrorMs !== null && results.keyboardCorrect.quarterErrorMs <= 600,
+  'correct keyboard countersteer no longer reaches quarter error promptly');
+assert(results.keyboardCorrect.bestErrorRatio < 0.30, 'correct keyboard countersteer did not materially reduce slide error');
+assert(results.keyboardCorrect.speedLossKmh < 4.0, 'keyboard recovery is hiding behind excessive speed loss');
+assert(results.keyboardCorrect.finalSlipDeg < 0.10, 'keyboard recovery left excessive final sideslip');
+
+assert.equal(results.keyboardIncorrect.halfErrorMs, null, 'incorrect keyboard steering unexpectedly recovered the disturbance');
+assert(results.keyboardIncorrect.bestErrorRatio > 0.95, 'incorrect steering is no longer clearly worse than correct countersteer');
+assert(results.keyboardIncorrect.finalSlipDeg > 5.0, 'incorrect steering no longer has a clear handling consequence');
+assert(results.keyboardIncorrect.speedLossKmh > results.neutral.speedLossKmh,
+  'incorrect steering no longer loses more speed than neutral');
+
+assert(results.touchCorrect.halfErrorMs !== null && results.touchCorrect.halfErrorMs <= 600,
+  'useful touch-wheel countersteer is no longer prompt enough');
+assert(results.touchCorrect.quarterErrorMs !== null && results.touchCorrect.quarterErrorMs <= 700,
+  'useful touch-wheel countersteer no longer reaches quarter error');
+assert(results.touchCorrect.bestErrorRatio < 0.30, 'touch-wheel countersteer did not materially reduce slide error');
+assert(results.touchCorrect.speedLossKmh < 4.0, 'touch recovery is hiding behind excessive speed loss');
+assert(results.touchCorrect.finalSlipDeg < 0.10, 'touch recovery left excessive final sideslip');
+assert(results.touchCorrect.oppositeSlipSnapDeg < 1.0, 'useful touch countersteer now creates excessive opposite slip snap');
+assert(results.touchCorrect.oppositeYawOvershootDegS < 25.0, 'useful touch countersteer now creates excessive yaw overshoot');
+
+assert.equal(results.touchExcessive.halfErrorMs, null, 'sustained full touch opposite lock unexpectedly behaves like a clean recovery');
+assert(results.touchExcessive.speedLossKmh > 8.0, 'excessive touch input no longer carries a meaningful speed-loss consequence');
+assert(results.touchExcessive.oppositeSlipSnapDeg > 10.0, 'excessive touch input no longer produces the measured opposite-direction snap');
+assert(results.touchExcessive.oppositeYawOvershootDegS > 45.0, 'excessive touch input no longer produces the measured yaw overshoot');
+
+for (const [normal, aidsOff, label] of [
+  [results.keyboardCorrect, results.keyboardCorrectAidsOff, 'keyboard'],
+  [results.touchCorrect, results.touchCorrectAidsOff, 'touch'],
+] as const) {
+  assert(Math.abs(normal.bestErrorRatio - aidsOff.bestErrorRatio) < 1e-9, label + ' recovery changed when ABS/TCS were disabled');
+  assert(Math.abs(normal.speedLossKmh - aidsOff.speedLossKmh) < 1e-9, label + ' speed loss changed when ABS/TCS were disabled');
+  assert(Math.abs(normal.finalSlipDeg - aidsOff.finalSlipDeg) < 1e-9, label + ' final slip changed when ABS/TCS were disabled');
+  assert.equal(normal.absInterventionSteps, 0, 'ABS unexpectedly drove ' + label + ' steering recovery');
+  assert.equal(normal.tcsInterventionSteps, 0, 'TCS unexpectedly drove ' + label + ' steering recovery');
+}
