@@ -1,10 +1,13 @@
 diff --git a/src/physics/TireModel.ts b/src/physics/TireModel.ts
 --- a/src/physics/TireModel.ts
 +++ b/src/physics/TireModel.ts
-@@ -197,13 +197,27 @@ export class TireModel {
+@@ -197,13 +197,30 @@ export class TireModel {
      const slipSeverity = Math.max(longSeverity, latSeverity);
      const slideBlendLinear = PhysicsMath.clamp((slipSeverity - 1.15) / 2.35, 0, 1);
      const slideBlend = slideBlendLinear * slideBlendLinear * (3 - 2 * slideBlendLinear);
++    const combinedSlideSeverity = Math.min(longSeverity, latSeverity);
++    const combinedSlideBlendLinear = PhysicsMath.clamp((combinedSlideSeverity - 1.15) / 2.35, 0, 1);
++    const combinedSlideBlend = combinedSlideBlendLinear * combinedSlideBlendLinear * (3 - 2 * combinedSlideBlendLinear);
      const slideScale = PhysicsMath.lerp(
        1.0,
        PhysicsMath.clamp(this.config.slideFrictionMultiplier, 0.45, 1.0),
@@ -20,12 +23,13 @@ diff --git a/src/physics/TireModel.ts b/src/physics/TireModel.ts
 +    // restore the missing kinetic-friction shear, so a locked tire in a sideways
 +    // slide can fall far below the already-calibrated sliding coefficient.
 +    //
-+    // Phase the adhesion weighting out only as the existing post-peak slide blend
-+    // becomes dominant. The existing slideScale and superellipse still set the
++    // Phase the adhesion weighting out only when both longitudinal and lateral slip
++    // are simultaneously beyond the peak. This leaves one-axis steering-reversal
++    // transients on their established response while correcting true combined sliding. The existing slideScale and superellipse still set the
 +    // available kinetic-friction magnitude, while pure braking, ordinary cornering,
 +    // and the onset of combined slip retain the donor curves unchanged.
-+    const slidingGXAlpha = PhysicsMath.lerp(gXAlpha, 1.0, slideBlend);
-+    const slidingGYKappa = PhysicsMath.lerp(gYKappa, 1.0, slideBlend);
++    const slidingGXAlpha = PhysicsMath.lerp(gXAlpha, 1.0, combinedSlideBlend);
++    const slidingGYKappa = PhysicsMath.lerp(gYKappa, 1.0, combinedSlideBlend);
 +    fx = pureFx * slidingGXAlpha * slideScale;
 +    fy = pureFy * slidingGYKappa * slideScale;
  
