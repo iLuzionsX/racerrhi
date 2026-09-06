@@ -110,7 +110,12 @@ await waitUntilPlayable(desktopPage);
 const desktopCanvas = await assertRenderableCanvas(desktopPage);
 
 await desktopPage.click('#drive');
+await desktopPage.bringToFront();
 await desktopPage.waitForFunction(() => !document.getElementById('hud')?.hidden);
+if (await desktopPage.locator('#pause-dialog').evaluate((el) => el.open)) {
+  await desktopPage.click('#resume');
+  await desktopPage.bringToFront();
+}
 await desktopPage.waitForFunction(() => !document.getElementById('countdown')?.hidden, null, { timeout: 5000 });
 try {
   await desktopPage.waitForFunction(() => document.getElementById('countdown')?.hidden, null, { timeout: 10000 });
@@ -121,6 +126,7 @@ try {
     speedText: document.getElementById('speed')?.textContent,
     hudHidden: document.getElementById('hud')?.hidden,
     visibilityState: document.visibilityState,
+    pauseDialogOpen: document.getElementById('pause-dialog')?.open,
   }));
   throw new Error('countdown did not advance: ' + JSON.stringify({ state, errors: desktopErrors }));
 }
