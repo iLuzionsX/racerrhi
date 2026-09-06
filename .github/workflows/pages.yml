@@ -52,6 +52,12 @@ jobs:
           node --check dist/ui.js
           node --check dist/visuals.js
           node test.mjs
+      - name: Install browser smoke dependencies
+        run: |
+          npm install --no-package-lock --no-save playwright@1.55.0 pngjs@7.0.0
+          npx playwright install --with-deps chromium
+      - name: Verify real browser startup and controls
+        run: node integration/browser-smoke.mjs
   deploy:
     needs: validate
     if: github.event_name != 'pull_request'
