@@ -629,6 +629,27 @@ const usefulPlans: DriverPlan[] = [
   },
 ];
 
+const legacyHeldPlans: DriverPlan[] = [
+  {
+    // Exact PR #17 behavior: countersteer was held for the full one-second
+    // measurement window, even after the slide error had already halved.
+    name: 'pr17-keyboard-held-1s',
+    kind: 'keyboard',
+    reactionMs: 0,
+    amplitude: 1,
+    holdMs: 1000,
+    unwindMs: 0,
+  },
+  {
+    name: 'pr17-touch-third-held-1s',
+    kind: 'touch',
+    reactionMs: 0,
+    amplitude: 0.33,
+    holdMs: 1000,
+    unwindMs: 0,
+  },
+];
+
 const adversePlans: DriverPlan[] = [
   {
     name: 'keyboard-too-late',
@@ -681,6 +702,16 @@ const baselineLead = injectedResults.filter(
     (result.plan === 'keyboard-balanced-release' || result.plan === 'touch-third-progressive')
 );
 
+const referenceDisturbance = disturbances.find(
+  (entry) => entry.speedKmh === 80 && entry.slipDeg === 8
+)!;
+const legacyReferenceResults = ([
+  1,
+  -1,
+] as const).flatMap((direction) =>
+  legacyHeldPlans.map((plan) => runInjected(direction, referenceDisturbance, plan))
+);
+
 const usefulResults = injectedResults.filter((result) =>
   usefulPlans.some((plan) => plan.name === result.plan)
 );
@@ -717,6 +748,7 @@ const summary = {
     successRate: adverseResults.filter((result) => result.success).length / adverseResults.length,
   },
   baselineLead,
+  legacyReferenceResults,
   crashDiagnostics,
   naturalResults,
   injectedResults,
@@ -724,10 +756,77 @@ const summary = {
 
 console.log(JSON.stringify(summary, null, 2));
 
-// Diagnostic-only first pass: lock only invariants that must hold before any tuning.
+// Acceptance thresholds are derived from the untouched merged-#17 baseline above,
+// before any handling coefficient change. They intentionally distinguish a clean
+// recovery from "eventually settled after a driver-created opposite rotation."
 assert.equal(injectedResults.length, 54, 'unexpected recovery matrix size');
-assert(usefulResults.some((result) => result.success), 'no useful driver plan recovered any modest slide');
-assert(adverseResults.some((result) => !result.success), 'adverse inputs no longer retain a handling consequence');
+assert(
+  usefulResults.filter((result) => result.success).length >= 24,
+  'fewer than 80% of the practical recovery matrix now settles cleanly',
+);
+const keyboardUseful = usefulResults.filter((result) => result.kind === 'keyboard');
+assert(
+  keyboardUseful.every((result) => result.success),
+  'a practical keyboard recovery case regressed',
+);
+const touchUseful = usefulResults.filter((result) => result.kind === 'touch');
+assert(
+  touchUseful.filter((result) => result.success).length >= 8,
+  'fewer than two thirds of the practical touch-wheel recovery cases settle cleanly',
+);
+
+for (const result of baselineLead) {
+  assert(result.success, '80 km/h reference recovery no longer settles');
+  assert(result.settledMs !== null && result.settledMs <= 1100, 'reference recovery settling exceeded 1.1 s');
+  assert(result.finalHeadingErrorDeg < 17, 'reference recovery heading error exceeded baseline envelope');
+  assert(result.finalPathDeviationM < 6.1, 'reference recovery path deviation exceeded baseline envelope');
+  assert(result.speedLossKmh < 4.5, 'reference recovery is hiding behind excessive speed loss');
+  assert(result.oppositeYawPeakDegS <= 1.0, 'proper reference unwind now creates a secondary yaw snap');
+  assert(result.oppositeSlipPeakDeg <= 0.10, 'proper reference unwind now creates opposite sideslip');
+  assert(result.maxForceStepN < 9000, 'reference recovery introduced a larger tire-force discontinuity');
+  assert.equal(result.absSteps, 0, 'reference recovery unexpectedly depends on ABS');
+  assert.equal(result.tcsSteps, 0, 'reference recovery unexpectedly depends on TCS');
+  assert.equal(result.chassisContactSamples, 0, 'reference recovery unexpectedly contacts the chassis shell');
+}
+
+for (const result of legacyReferenceResults) {
+  assert(
+    result.oppositeYawPeakDegS >= 18 && result.oppositeYawPeakDegS < 25,
+    'the historical held-countersteer case no longer reproduces its measured secondary yaw',
+  );
+  assert(
+    result.driverStillRequestingSteerAtOppositeYawPeak,
+    'historical secondary yaw no longer coincides with an active driver steering request',
+  );
+  assert(
+    result.oppositeYawPeakAtMs !== null && result.oppositeYawPeakAtMs <= 1000 + DT_MS,
+    'historical secondary yaw peak moved outside the held-countersteer interval',
+  );
+}
+
+const tooLate = adverseResults.filter((result) => result.plan === 'keyboard-too-late');
+const wrongWay = adverseResults.filter((result) => result.plan === 'touch-incorrect');
+const sustainedKeyboard = adverseResults.filter(
+  (result) => result.plan === 'keyboard-sustained-opposite-lock'
+);
+const lateTouch = adverseResults.filter((result) => result.plan === 'touch-late-release');
+assert(
+  tooLate.filter((result) => result.success).length <= 2,
+  'late correction no longer carries the measured recovery penalty',
+);
+assert(
+  wrongWay.filter((result) => result.success).length <= 2,
+  'incorrect correction no longer carries the measured recovery penalty',
+);
+assert(
+  sustainedKeyboard.every((result) => result.oppositeYawPeakDegS >= 15),
+  'sustained keyboard opposite lock no longer creates meaningful opposite rotation',
+);
+assert(
+  lateTouch.every((result) => result.oppositeYawPeakDegS >= 9),
+  'late touch-wheel release no longer creates meaningful opposite rotation',
+);
+
 for (const result of injectedResults) {
   assert(Number.isFinite(result.finalSlipDeg));
   assert(Number.isFinite(result.finalYawDegS));
@@ -735,5 +834,24 @@ for (const result of injectedResults) {
   assert(Number.isFinite(result.maxForceStepN));
 }
 for (const result of crashDiagnostics.filter((entry) => entry.applyStabilizer)) {
-  assert(result.interventionSteps === 0, 'upright modest slide unexpectedly invoked crash stabilization');
+  assert.equal(result.interventionSteps, 0, 'upright modest slide unexpectedly invoked crash stabilization');
+  assert.equal(result.maxLinearChangeMs, 0, 'crash stabilizer changed linear velocity in a modest upright slide');
+  assert.equal(result.maxAngularChangeRadS, 0, 'crash stabilizer changed angular velocity in a modest upright slide');
+}
+
+for (const kind of ['lift-off', 'trail-brake', 'throttle-exit', 'kerb-transition'] as const) {
+  const pair = naturalResults.filter((result: any) => result.kind === kind) as any[];
+  assert.equal(pair.length, 2, `missing left/right natural ${kind} pair`);
+  assert(
+    Math.abs(pair[0].peakSlipDeg - pair[1].peakSlipDeg) < 0.08,
+    `left/right ${kind} peak sideslip lost symmetry`,
+  );
+  assert(
+    Math.abs(pair[0].peakYawDegS - pair[1].peakYawDegS) < 0.08,
+    `left/right ${kind} peak yaw lost symmetry`,
+  );
+  assert(
+    pair.every((result) => result.finalSlipDeg < 0.55 && result.finalYawDegS < 2.5),
+    `natural ${kind} unwind no longer settles`,
+  );
 }
