@@ -201,6 +201,28 @@ const cx = wheelBox.x + wheelBox.width / 2;
 const cy = wheelBox.y + wheelBox.height / 2;
 const wheelStartX = wheelBox.x + wheelBox.width * 0.90;
 const wheelEndY = wheelBox.y + wheelBox.height * 0.90;
+
+// Verify ordinary touch release on the wheel before exercising cancellation.
+await cdp.send('Input.dispatchTouchEvent', {
+  type: 'touchStart',
+  touchPoints: [touchPoint(wheelStartX, cy, 72)],
+});
+await cdp.send('Input.dispatchTouchEvent', {
+  type: 'touchMove',
+  touchPoints: [touchPoint(cx, wheelEndY, 72)],
+});
+await mobilePage.waitForTimeout(80);
+const steerValue = Number(await wheel.getAttribute('aria-valuenow'));
+if (!Number.isFinite(steerValue) || Math.abs(steerValue) < 10) {
+  throw new Error('mobile steering drag did not produce an analog steering command');
+}
+await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+await mobilePage.waitForFunction(
+  () => Math.abs(Number(document.getElementById('wheel')?.getAttribute('aria-valuenow') || '0')) < 5,
+  null,
+  { timeout: 2000 },
+);
+
 // Real multitouch regression from a clean pointer state: the touch wheel must
 // steer while a pedal is held, and a browser/OS cancellation must release both
 // controls cleanly. The gas-only gesture above separately covers touchend.
@@ -271,7 +293,7 @@ console.log(JSON.stringify({
   },
   mobile: {
     canvas: mobileCanvas,
-    steeringAriaPercentAfterDrag: simultaneousSteerValue,
+    steeringAriaPercentAfterDrag: steerValue,
     simultaneousSteeringAndGasAriaPercent: simultaneousSteerValue,
     gasTouchLifecycle: 'touchend + simultaneous touchcancel passed',
     brakeTouchCancelLifecycle: 'passed',
