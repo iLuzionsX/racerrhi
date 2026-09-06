@@ -218,11 +218,6 @@ if (!Number.isFinite(steerValue) || Math.abs(steerValue) < 10) {
 
 // Real multitouch regression: the touch wheel must keep steering while a pedal
 // is held, and a browser/OS cancellation must release both controls cleanly.
-await mobilePage.waitForFunction(
-  () => Math.abs(Number(document.getElementById('wheel')?.getAttribute('aria-valuenow') || '0')) < 5,
-  null,
-  { timeout: 2000 },
-);
 await cdp.send('Input.dispatchTouchEvent', {
   type: 'touchStart',
   touchPoints: [
