@@ -591,6 +591,16 @@ export function resetM5StepScheduler(clock: M5StepScheduler) {
   return clock;
 }
 
+/**
+ * Pause/resume contract: discard only the fractional un-simulated remainder.
+ * Already simulated time and dropped-time diagnostics remain monotonic.
+ */
+export function pauseM5StepScheduler(clock: M5StepScheduler) {
+  clock.accumulatorS = 0;
+  clock.lastDroppedTimeS = 0;
+  return clock;
+}
+
 export function consumeM5FrameTime(
   clock: M5StepScheduler,
   frameDeltaS: number,
