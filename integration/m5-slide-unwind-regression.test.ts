@@ -172,6 +172,14 @@ function runInjected(
   let settledMs: number | null = null;
   let settleStreak = 0;
   let oppositeYawPeakDegS = 0;
+  let oppositeYawPeakAtMs: number | null = null;
+  let firstOppositeYawMs: number | null = null;
+  let driverRequestAtOppositeYawPeak = 0;
+  let effectiveSteeringAtOppositeYawPeak = 0;
+  let roadWheelAtOppositeYawPeakDeg = 0;
+  let ownerAtOppositeYawPeak: SteeringKind | 'neutral' = 'neutral';
+  let roadWheelCenteredMs: number | null = null;
+  let roadWheelCenterStreak = 0;
   let oppositeSlipPeakDeg = 0;
   let peakHeadingErrorDeg = 0;
   let maxPathDeviationM = 0;
@@ -185,6 +193,7 @@ function runInjected(
   let chassisContactSamples = 0;
   const initialYawSign = Math.sign(state.yawRate) || directionSign;
   const initialSlipSign = Math.sign(state.slip) || -directionSign;
+  const unwindStartMs = plan.reactionMs + plan.holdMs;
   let previousForces = state.wheels.map((wheel: any) =>
     Math.hypot(wheel.forceLongitudinalN, wheel.forceLateralN)
   );
@@ -214,8 +223,27 @@ function runInjected(
 
     const slipDeg = Math.abs(state.slip) * DEG;
     const yawDegS = Math.abs(state.yawRate) * DEG;
+    const driverRequest = input.analogSteerActive
+      ? finite(input.analogSteerTarget)
+      : finite(input.digitalSteerDirection);
+    const activeOwner: SteeringKind | 'neutral' = input.analogSteerActive
+      ? 'touch'
+      : Math.abs(driverRequest) > 1e-9
+        ? 'keyboard'
+        : 'neutral';
     if (Math.sign(state.yawRate) === -initialYawSign) {
-      oppositeYawPeakDegS = Math.max(oppositeYawPeakDegS, yawDegS);
+      if (firstOppositeYawMs === null) firstOppositeYawMs = (i + 1) * DT_MS;
+      if (yawDegS > oppositeYawPeakDegS) {
+        oppositeYawPeakDegS = yawDegS;
+        oppositeYawPeakAtMs = (i + 1) * DT_MS;
+        driverRequestAtOppositeYawPeak = driverRequest;
+        effectiveSteeringAtOppositeYawPeak =
+          Math.abs(sim.analogSteeringInput) > 1e-9
+            ? sim.analogSteeringInput
+            : sim.digitalSteeringInput;
+        roadWheelAtOppositeYawPeakDeg = state.steer * DEG;
+        ownerAtOppositeYawPeak = activeOwner;
+      }
     }
     if (Math.sign(state.slip) === -initialSlipSign) {
       oppositeSlipPeakDeg = Math.max(oppositeSlipPeakDeg, slipDeg);
@@ -250,6 +278,15 @@ function runInjected(
 
     if (state.absActive) absSteps++;
     if (state.tcsActive) tcsSteps++;
+
+    if (elapsedMs >= unwindStartMs) {
+      roadWheelCenterStreak = Math.abs(state.steer) * DEG < 0.75
+        ? roadWheelCenterStreak + 1
+        : 0;
+      if (roadWheelCenteredMs === null && roadWheelCenterStreak >= 6) {
+        roadWheelCenteredMs = (i + 1 - 5) * DT_MS;
+      }
+    }
 
     const settledNow =
       Math.abs(state.slip) * DEG < 1.0 &&
@@ -292,6 +329,16 @@ function runInjected(
     finalPathDeviationM,
     oppositeSlipPeakDeg,
     oppositeYawPeakDegS,
+    firstOppositeYawMs,
+    oppositeYawPeakAtMs,
+    unwindStartMs,
+    roadWheelCenteredMs,
+    driverRequestAtOppositeYawPeak,
+    driverStillRequestingSteerAtOppositeYawPeak:
+      Math.abs(driverRequestAtOppositeYawPeak) > 0.02,
+    effectiveSteeringAtOppositeYawPeak,
+    roadWheelAtOppositeYawPeakDeg,
+    ownerAtOppositeYawPeak,
     maxRoadWheelDeg,
     maxEffectiveSteering,
     maxRawRelaxedSlipDeltaDeg,
