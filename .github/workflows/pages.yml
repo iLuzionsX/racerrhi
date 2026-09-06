@@ -151,12 +151,12 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
       - name: Install deployed-preview browser smoke dependencies
-        if: github.ref_name == 'astra/slide-recovery-unwind' || github.ref_name == 'astra/progressive-speed-steering' || github.ref_name == 'astra/slide-braking-friction' || github.ref_name == 'astra/slide-braking-friction'
+        if: github.ref_name == 'astra/slide-recovery-unwind' || github.ref_name == 'astra/progressive-speed-steering' || github.ref_name == 'astra/slide-braking-friction'
         run: |
           npm install --no-package-lock --no-save playwright@1.55.0 pngjs@7.0.0
           npx playwright install --with-deps chromium
       - name: Verify deployed public preview in real Chromium
-        if: github.ref_name == 'astra/slide-recovery-unwind' || github.ref_name == 'astra/progressive-speed-steering'
+        if: github.ref_name == 'astra/slide-recovery-unwind' || github.ref_name == 'astra/progressive-speed-steering' || github.ref_name == 'astra/slide-braking-friction'
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
           EXPECTED_COMMIT: ${{ github.sha }}
