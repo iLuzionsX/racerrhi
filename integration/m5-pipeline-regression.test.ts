@@ -130,6 +130,44 @@ assert(leftTurn.peakSlip < .45 && rightTurn.peakSlip < .45, 'first-turn sideslip
 assert(Math.abs(leftTurn.peakYaw-rightTurn.peakYaw) / Math.max(.01,leftTurn.peakYaw,rightTurn.peakYaw) < .15,
   'left/right yaw response lost symmetry');
 
+// Racerrhi renders each wheel from bridge hubWorldPos. Those coordinates must be
+// the exact support/contact coordinates used by Vehicle/Suspension, not the donor
+// state adapter's extra presentation-only control-arm migration.
+function wheelSupportAlignment(turn:{state:any}) {
+  const state = turn.state;
+  const sim:any = state._m5;
+  const decorated = sim.vehicle.getState();
+  let maxDecoratedMigrationM = 0;
+  let maxBridgeSupportErrorM = 0;
+
+  state.wheels.forEach((wheel:any,index:number)=>{
+    const susp = sim.vehicle.suspension.states[index];
+    const physical = susp.contactPointWorld;
+    const bridgeError = Math.hypot(
+      wheel.hubWorldPos.x - physical.x,
+      wheel.hubWorldPos.z - physical.z,
+    );
+    maxBridgeSupportErrorM = Math.max(maxBridgeSupportErrorM, bridgeError);
+    assert(bridgeError < 1e-9, wheel.id+' rendered hub left the physical tire support line');
+    assert(near(wheel.hubWorldPos.y,susp.hubPositionWorldY,1e-9), wheel.id+' rendered hub height diverged from unsprung state');
+    assert(near(wheel.groundContactPos.x,physical.x,1e-9));
+    assert(near(wheel.groundContactPos.y,physical.y,1e-9));
+    assert(near(wheel.groundContactPos.z,physical.z,1e-9));
+
+    const donorHub = decorated.wheels[index]?.hubWorldPos;
+    if(donorHub) {
+      maxDecoratedMigrationM = Math.max(
+        maxDecoratedMigrationM,
+        Math.hypot(donorHub.x-physical.x,donorHub.z-physical.z),
+      );
+    }
+  });
+
+  return { maxDecoratedMigrationM, maxBridgeSupportErrorM };
+}
+const leftWheelSupport = wheelSupportAlignment(leftTurn);
+const rightWheelSupport = wheelSupportAlignment(rightTurn);
+
 // -----------------------------------------------------------------------------
 // 3) Sustained corner -> lift -> brake -> throttle exit remains progressive.
 // -----------------------------------------------------------------------------
@@ -480,6 +518,12 @@ console.log(JSON.stringify({
     rightPeakYawDegS:rightTurn.peakYaw*180/Math.PI,
     leftPeakSideslipDeg:leftTurn.peakSlip*180/Math.PI,
     rightPeakSideslipDeg:rightTurn.peakSlip*180/Math.PI,
+  },
+  wheelSupportSync:{
+    leftTurnDecoratedMigrationMm:leftWheelSupport.maxDecoratedMigrationM*1000,
+    rightTurnDecoratedMigrationMm:rightWheelSupport.maxDecoratedMigrationM*1000,
+    leftTurnBridgeSupportErrorMm:leftWheelSupport.maxBridgeSupportErrorM*1000,
+    rightTurnBridgeSupportErrorMm:rightWheelSupport.maxBridgeSupportErrorM*1000,
   },
   drivePhases:drivePhases.map(phase=>({
     name:phase.name,
