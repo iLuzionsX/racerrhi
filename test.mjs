@@ -24,7 +24,7 @@ assert(Math.abs(s.speed)<5);console.log('PASS M5 sustained braking');
 
 s=newCar(0,0,0);setCarPose(s,0,0,0,25);const startHeading=s.heading;
 for(let i=0;i<240;i++)stepCar(s,{throttle:.1,brake:0,steer:.45},1/120,road);
-assert(Object.values(s).filter(v=>typeof v==='number').every(Number.isFinite));assert.equal(s.wheels.length,4);assert(s.wheels.slice(0,2).every(w=>Number.isFinite(w.steerAngle)&&Number.isFinite(w.rotationAngle)));assert(Math.abs(s.wheels[0].steerAngle)>.01&&Math.abs(s.wheels[1].steerAngle)>.01);assert(Math.abs(s.heading-startHeading)>.02);assert(Math.abs(s.roll)<1.25);console.log('PASS M5 steering produces bounded chassis response with per-wheel telemetry');
+assert(Object.values(s).filter(v=>typeof v==='number').every(Number.isFinite));assert.equal(s.wheels.length,4);assert(s.wheels.slice(0,2).every(w=>Number.isFinite(w.steerAngleRad)&&Number.isFinite(w.rotationAngleRad)));assert(Math.abs(s.wheels[0].steerAngleRad)>.01&&Math.abs(s.wheels[1].steerAngleRad)>.01);assert(Math.abs(s.heading-startHeading)>.02);assert(Math.abs(s.roll)<1.25);console.log('PASS M5 steering produces bounded chassis response with per-wheel telemetry');
 
 const lap=()=>({elapsed:0,next:1,previous:0,valid:true,count:1});let l=lap();for(const t of [.05,.26,.51,.76,.95])advanceLap(l,t,true,10);assert.equal(advanceLap(l,.01,true,1),51);console.log('PASS ordered sectors complete lap');
 l=lap();advanceLap(l,.95,true,1);assert.equal(advanceLap(l,.01,true,1),null);console.log('PASS start-line shortcut rejected');
@@ -35,10 +35,10 @@ assert(gameSource.includes('car.add(steerPivot)'));assert(!gameSource.includes('
 
 const indexSource=fs.readFileSync(new URL('./dist/index.html',import.meta.url),'utf8');
 const uiSource=fs.readFileSync(new URL('./dist/ui.js',import.meta.url),'utf8');
-assert(gameSource.includes('w.rotation.y=steer;'));assert(!gameSource.includes('w.rotation.y=-steer;'));console.log('PASS M5 render steering sign matches vehicle turn direction');
-assert(indexSource.includes('maximum-scale=1,user-scalable=no'));assert(indexSource.includes('./ui.js?v=4')&&indexSource.includes('./game.js?v=7'));assert(uiSource.includes("document.addEventListener('touchend'")&&uiSource.includes("{passive:false}"));console.log('PASS Mobile Safari double-tap zoom suppression and cache-busted controls');
+assert(gameSource.includes('w.rotation.y=ws.steerAngleRad;'));assert(!gameSource.includes('w.rotation.y=-steer;'));assert(gameSource.includes('wheelStateById.get(w.userData.id)'));console.log('PASS M5 render steering sign and wheel identity match vehicle physics');
+assert(indexSource.includes('maximum-scale=1,user-scalable=no'));assert(indexSource.includes('./ui.js?v=4')&&indexSource.includes('./game.js?v=8'));assert(uiSource.includes("document.addEventListener('touchend'")&&uiSource.includes("{passive:false}"));console.log('PASS Mobile Safari double-tap zoom suppression and cache-busted controls');
 
-assert(uiSource.includes("'gesturestart','gesturechange','gestureend'"));assert(uiSource.includes("e.touches.length>1")&&uiSource.includes("document.addEventListener('touchmove'"));assert(indexSource.includes('./ui.js?v=4')&&indexSource.includes('./game.js?v=7'));assert(gameSource.includes("./ui.js?v=4"));console.log('PASS Mobile Safari pinch zoom suppression and synchronized v4 module cache bust');
+assert(uiSource.includes("'gesturestart','gesturechange','gestureend'"));assert(uiSource.includes("e.touches.length>1")&&uiSource.includes("document.addEventListener('touchmove'"));assert(indexSource.includes('./ui.js?v=4')&&indexSource.includes('./game.js?v=8'));assert(gameSource.includes("./ui.js?v=4"));console.log('PASS Mobile Safari pinch zoom suppression and synchronized v4 module cache bust');
 
 assert(gameSource.includes("d=a.d.clone().lerp(b.d,u).normalize()"));assert(gameSource.includes("n=a.n.clone().lerp(b.n,u).normalize()"));console.log('PASS Racerrhi road tangent/normal interpolation for M5 suspension continuity');
 
@@ -54,7 +54,7 @@ const old200Lag=estimatedSteadyStateLagM(200/3.6,4);
 assert(old200Lag>13);
 const high=chaseCameraProfile(300/3.6);
 assert(high.distanceM+high.maxWorldLagM<=12.01);
-assert(gameSource.includes("chaseCameraProfile(state.speed)"));
+assert(gameSource.includes("chaseCameraProfile(renderState.speedMs)"));
 assert(gameSource.includes("chaseErrorLength>chaseProfile.maxWorldLagM"));
 console.log('PASS chase camera high-speed pullback and world-space lag are bounded');
 
