@@ -49,6 +49,9 @@ const browser = await chromium.launch({
     '--ignore-gpu-blocklist',
     '--use-gl=angle',
     '--use-angle=swiftshader',
+    '--disable-background-timer-throttling',
+    '--disable-renderer-backgrounding',
+    '--disable-backgrounding-occluded-windows',
   ],
 });
 
