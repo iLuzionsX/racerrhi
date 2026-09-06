@@ -40,7 +40,14 @@ const server = http.createServer((req, res) => {
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 const address = server.address();
 if (!address || typeof address === 'string') throw new Error('failed to bind browser-smoke server');
-const url = `http://127.0.0.1:${address.port}/`;
+const localUrl = `http://127.0.0.1:${address.port}/`;
+const url = process.env.RACERRHI_SMOKE_URL || localUrl;
+const expectedCommit = process.env.RACERRHI_EXPECTED_COMMIT || '';
+const expectedDonor = process.env.RACERRHI_EXPECTED_DONOR || '';
+
+if (process.env.RACERRHI_SMOKE_URL && !url.startsWith('https://')) {
+  throw new Error('public preview smoke requires an HTTPS URL');
+}
 
 const browser = await chromium.launch({
   headless: false,
@@ -103,10 +110,28 @@ async function waitUntilPlayable(page) {
   }, null, { timeout: 20_000 });
 }
 
+async function assertExpectedBuildInfo(page) {
+  if (!expectedCommit && !expectedDonor) return null;
+  const info = await page.evaluate(async () => {
+    const response = await fetch('./build-info.json', { cache: 'no-store' });
+    if (!response.ok) throw new Error('build-info.json returned HTTP ' + response.status);
+    return response.json();
+  });
+  if (expectedCommit && info.commit !== expectedCommit) {
+    throw new Error(`live build commit mismatch: expected ${expectedCommit}, got ${info.commit}`);
+  }
+  if (expectedDonor && info.donor !== expectedDonor) {
+    throw new Error(`live donor mismatch: expected ${expectedDonor}, got ${info.donor}`);
+  }
+  return info;
+}
+
 const desktop = await browser.newContext({ viewport: { width: 480, height: 270 }, deviceScaleFactor: 1 });
 const desktopPage = await desktop.newPage();
 const desktopErrors = pageDiagnostics(desktopPage);
 await waitUntilPlayable(desktopPage);
+const liveBuildInfo = await assertExpectedBuildInfo(desktopPage);
+if (liveBuildInfo) console.log('LIVE_BUILD_INFO ' + JSON.stringify(liveBuildInfo));
 const desktopCanvas = await assertRenderableCanvas(desktopPage);
 
 await desktopPage.click('#drive');
