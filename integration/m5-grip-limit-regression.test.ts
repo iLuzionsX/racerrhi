@@ -409,8 +409,15 @@ function slideRecovery(overrides: Record<string, number>) {
   let maxForceStepN = 0;
   let previous = state.wheels.map(forceMagnitude);
 
+  // This regression compares tire-relaxation calibrations, not keyboard
+  // steering policy. Use the same fixed analog countersteer pulse for baseline
+  // and corrected tires so input slew changes cannot erase the force-step A/B.
   for (let i = 0; i < 120; i++) {
-    stepCar(state, { digitalSteerDirection: -1, throttle: 0.12 }, M5_FIXED_DT);
+    stepCar(state, {
+      analogSteerTarget: 0.70,
+      analogSteerActive: true,
+      throttle: 0.12,
+    }, M5_FIXED_DT);
     const error = Math.abs(state.slip) + Math.abs(state.yawRate) * 0.35;
     bestError = Math.min(bestError, error);
     if (halfErrorMs === null && error <= initialError * 0.5) {
@@ -425,7 +432,11 @@ function slideRecovery(overrides: Record<string, number>) {
     });
   }
   for (let i = 0; i < 72; i++) {
-    stepCar(state, { digitalSteerDirection: 0, throttle: 0.15 }, M5_FIXED_DT);
+    stepCar(state, {
+      analogSteerTarget: 0,
+      analogSteerActive: true,
+      throttle: 0.15,
+    }, M5_FIXED_DT);
   }
 
   return {
