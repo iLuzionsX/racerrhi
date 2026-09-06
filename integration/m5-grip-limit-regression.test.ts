@@ -1,5 +1,6 @@
 import { strict as assert } from 'node:assert';
 import { PhysicsMath } from '../.vendor/Racing26/src/physics/math/PhysicsMath';
+import { updateDigitalSteeringInput } from '../.vendor/Racing26/src/physics/DigitalSteeringInput';
 import {
   M5_FIXED_DT,
   setSurfaceSampler,
@@ -409,15 +410,44 @@ function slideRecovery(overrides: Record<string, number>) {
   let maxForceStepN = 0;
   let previous = state.wheels.map(forceMagnitude);
 
-  // This regression compares tire-relaxation calibrations, not keyboard
-  // steering policy. Use the same fixed analog countersteer pulse for baseline
-  // and corrected tires so input slew changes cannot erase the force-step A/B.
+  // This regression protects the tire-relaxation calibration, not Racerrhi's
+  // current keyboard policy. Replay the pinned donor's original digital steering
+  // law directly so its historical baseline/corrected A/B remains comparable.
+  let donorDigitalSteer = 0;
+  const donorKeyboardStep = (direction: -1 | 0 | 1, throttle: number) => {
+    const localVelocity = sim.vehicle.rigidBody.getLocalVelocity();
+    const localAngularVelocity = sim.vehicle.rigidBody.getLocalAngularVelocity();
+    const speedMs = Math.hypot(localVelocity.x, localVelocity.z);
+    const sideslipRad =
+      speedMs > 0.5
+        ? Math.atan2(localVelocity.x, Math.max(0.5, Math.abs(localVelocity.z)))
+        : 0;
+    donorDigitalSteer = updateDigitalSteeringInput(
+      donorDigitalSteer,
+      direction,
+      speedMs,
+      M5_FIXED_DT,
+      {
+        wheelbaseM: sim.vehicle.config.wheelbase,
+        maxSteerAngleRad: sim.vehicle.config.maxSteerAngle,
+        yawRateRadS: localAngularVelocity.y,
+        sideslipRad,
+        forwardSpeedMs: localVelocity.z,
+      },
+    );
+    sim.stepExplicit({
+      throttle,
+      brake: 0,
+      steer: donorDigitalSteer,
+      handbrake: false,
+      shiftUp: false,
+      shiftDown: false,
+    }, 1);
+    refreshCarState(state);
+  };
+
   for (let i = 0; i < 120; i++) {
-    stepCar(state, {
-      analogSteerTarget: 0.70,
-      analogSteerActive: true,
-      throttle: 0.12,
-    }, M5_FIXED_DT);
+    donorKeyboardStep(-1, 0.12);
     const error = Math.abs(state.slip) + Math.abs(state.yawRate) * 0.35;
     bestError = Math.min(bestError, error);
     if (halfErrorMs === null && error <= initialError * 0.5) {
@@ -432,11 +462,7 @@ function slideRecovery(overrides: Record<string, number>) {
     });
   }
   for (let i = 0; i < 72; i++) {
-    stepCar(state, {
-      analogSteerTarget: 0,
-      analogSteerActive: true,
-      throttle: 0.15,
-    }, M5_FIXED_DT);
+    donorKeyboardStep(0, 0.15);
   }
 
   return {
