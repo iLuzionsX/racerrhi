@@ -304,29 +304,44 @@ function hydrate(target: M5CarState, sim: Simulation, raw: VehicleState = sim.ve
   };
   target.absActive = Boolean(raw.absActive);
   target.tcsActive = Boolean(raw.tcsActive);
+  const hardpointsBody = sim.vehicle.getHardpointsBody();
+  const bodyPosition = sim.vehicle.rigidBody.position;
+  const bodyOrientation = sim.vehicle.rigidBody.orientation;
   target.wheels = raw.wheels.map((wheel, index) => {
     const suspensionState = sim.vehicle.suspension.states[index];
     const physicalContact = suspensionState?.contactPointWorld;
+    const hardpointBody = hardpointsBody[index];
+    const supportBodyY = sim.vehicle.planarSupportBodyYByCorner[index];
 
-    // Racing26's SuspensionKinematicsAdapter decorates getState() wheel coordinates
-    // with a small control-arm migration for its own presentation/debug telemetry.
-    // The actual Racerrhi tire shear/support point remains suspension.contactPointWorld.
-    // Rendering the decorated X/Z here made the wheel meshes migrate laterally under
-    // load transfer while the chassis and tire forces stayed on the physical support
-    // line, which looked like the body sliding left/right off the wheels in corners.
-    // Keep the donor steering/camber kinematics, but bind Racerrhi's visible wheel
-    // centers to the exact support coordinates used by the physics solver.
+    // Suspension contact X/Z is evaluated at the beginning of the fixed step, while
+    // getState() is read after the rigid body has advanced to t + dt. At 160 km/h
+    // that stale support coordinate trails the chassis by roughly 0.37 m per 120 Hz
+    // step, so the wheels visibly leave the body in fast corners even though the
+    // force solve itself is behaving correctly.
+    //
+    // Reconstruct the exact body-fixed planar support line at the end-of-step pose
+    // for presentation. This mirrors SuspensionSystem's support transform but does
+    // not feed back into physics, tire forces, suspension history, or PR #18's road
+    // load timing correction.
+    const supportBody = PhysicsMath.vec3(
+      finite(hardpointBody?.x),
+      finite(supportBodyY),
+      finite(hardpointBody?.z)
+    );
+    const supportOffsetWorld = PhysicsMath.quatRotateVec3(bodyOrientation, supportBody);
+    const endSupportWorld = PhysicsMath.vec3Add(bodyPosition, supportOffsetWorld);
     const rawHub = vec3(wheel.hubWorldPos);
     const rawContact = vec3(wheel.groundContactPos);
+    const endSurface = surfaceFromRoad(endSupportWorld.x, endSupportWorld.z);
     const hubWorldPos = {
-      x: finite(physicalContact?.x, rawHub.x),
+      x: finite(endSupportWorld.x, finite(physicalContact?.x, rawHub.x)),
       y: finite(suspensionState?.hubPositionWorldY, rawHub.y),
-      z: finite(physicalContact?.z, rawHub.z),
+      z: finite(endSupportWorld.z, finite(physicalContact?.z, rawHub.z)),
     };
     const groundContactPos = {
-      x: finite(physicalContact?.x, rawContact.x),
-      y: finite(physicalContact?.y, rawContact.y),
-      z: finite(physicalContact?.z, rawContact.z),
+      x: finite(endSupportWorld.x, finite(physicalContact?.x, rawContact.x)),
+      y: finite(endSurface.elevation, finite(physicalContact?.y, rawContact.y)),
+      z: finite(endSupportWorld.z, finite(physicalContact?.z, rawContact.z)),
     };
 
     return {
