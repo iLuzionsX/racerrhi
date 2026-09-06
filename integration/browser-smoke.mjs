@@ -409,6 +409,9 @@ await waitUi(async () => (await import('./ui.js?v=4')).input.held === true, 'cap
 const lostPointerId = await activeWheelPointerId();
 await touch('touchMove', [wheelPoint(4, true)]);
 await wheel.evaluate((el, pointerId) => el.releasePointerCapture(pointerId), lostPointerId);
+// Pointer capture changes are processed on the next pointer event. Use the still-active
+// trusted touch source to flush the pending loss instead of fabricating a DOM PointerEvent.
+await touch('touchMove', [tp(wheelOutsideX, wheelOutsideY, 4)]);
 await waitUi(async () => (await import('./ui.js?v=4')).input.held === false, 'lostpointercapture left analog steering ownership held');
 const lostTraceBeforeEnd = await readPointerTrace();
 if (!lostTraceBeforeEnd.some((entry) => entry.type === 'lostpointercapture' && entry.pointerId === lostPointerId)) {
