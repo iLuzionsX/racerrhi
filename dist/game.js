@@ -1,6 +1,6 @@
 import * as T from 'three';
 import {clamp} from './controls.mjs';
-import {stepCar,newCar,advanceLap,setSurfaceSampler,setCarPose,loadM5Visual} from './physics.mjs';
+import {M5_FIXED_DT,stepCar,newCar,advanceLap,setSurfaceSampler,resolveBoundaryContact,loadM5Visual,captureM5RenderSnapshot,interpolateM5RenderSnapshots,createM5StepScheduler,resetM5StepScheduler,consumeM5FrameTime} from './physics.mjs';
 import {config,input as touchInput,clearInput,sessionVisible} from './ui.js?v=4';
 import {surfaces,foliage,furniture} from './visuals.js';
 import {chaseCameraProfile} from './chase-camera.mjs';
@@ -74,9 +74,9 @@ try{
  const tireGeo=new T.CylinderGeometry(.369,.369,.285,28);tireGeo.rotateZ(Math.PI/2);
  const rimGeo=new T.CylinderGeometry(.268,.268,.292,20);rimGeo.rotateZ(Math.PI/2);
  const frontZ=1.367,rearZ=-1.638;
- const wheelLayout=[[.842,frontZ,true],[-.842,frontZ,true],[.830,rearZ,false],[-.830,rearZ,false]];
+ const wheelLayout=[['FL',.842,frontZ,true],['FR',-.842,frontZ,true],['RL',.830,rearZ,false],['RR',-.830,rearZ,false]];
  for(let wheelIndex=0;wheelIndex<wheelLayout.length;wheelIndex++){
-   const [x,z,front]=wheelLayout[wheelIndex];
+   const [id,x,z,front]=wheelLayout[wheelIndex];
    // Keep steering and rolling on separate transform nodes. Combining them on one
    // Euler rotation makes a steered spinning wheel precess/tumble visually.
    const steerPivot=new T.Group(),spinPivot=new T.Group();
@@ -86,7 +86,7 @@ try{
    // `car` sits 35 mm above the sampled road. Keep the hub at the physical
    // 369 mm wheel radius and do NOT inherit chassis pitch/roll from `body`.
    steerPivot.position.set(x,.369-.035,z);
-   steerPivot.userData.front=front;steerPivot.userData.index=wheelIndex;steerPivot.userData.spinPivot=spinPivot;
+   steerPivot.userData.id=id;steerPivot.userData.front=front;steerPivot.userData.index=wheelIndex;steerPivot.userData.spinPivot=spinPivot;
    car.add(steerPivot);wheels.push(steerPivot);
  }
  modelLoaded=true;
@@ -94,28 +94,61 @@ try{
 // Soft contact shadow anchors the downloaded car even outside the moving shadow frustum.
 const shadowCanvas=document.createElement('canvas');shadowCanvas.width=128;shadowCanvas.height=256;const sc=shadowCanvas.getContext('2d'),gradient=sc.createRadialGradient(64,128,5,64,128,108);gradient.addColorStop(0,'rgba(0,0,0,.65)');gradient.addColorStop(1,'rgba(0,0,0,0)');sc.fillStyle=gradient;sc.fillRect(0,0,128,256);const shadow=new T.Mesh(new T.PlaneGeometry(3.2,5.6),new T.MeshBasicMaterial({map:new T.CanvasTexture(shadowCanvas),transparent:true,depthWrite:false}));shadow.rotation.x=-Math.PI/2;shadow.position.y=.03;car.add(shadow);
 await visualReady;
-let state=newCar(start.p.x,start.p.z,yaw),mode='intro',paused=false,cam=0,demoT=.022,clock=0,accumulator=0,prev=performance.now(),toastEnd=0,lap,best=0;try{best=Number(localStorage.getItem('apex-best-v1'))||0;}catch{}
+let state=newCar(start.p.x,start.p.z,yaw),mode='intro',paused=false,cam=0,demoT=.022,clock=0,prev=performance.now(),toastEnd=0,lap,best=0;const physicsClock=createM5StepScheduler();let renderPrevious=captureM5RenderSnapshot(state),renderCurrent=renderPrevious;try{best=Number(localStorage.getItem('apex-best-v1'))||0;}catch{}
 const keys=new Set();const resetLap=()=>({elapsed:0,next:1,previous:0,valid:true,count:1});lap=resetLap();const fmt=n=>{const m=Math.floor(n/60),s=Math.floor(n%60),ms=Math.floor(n%1*1000);return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(ms).padStart(3,'0')}`;};$('best').textContent=best?fmt(best):'—';
 function toast(s){$('toast').textContent=s;$('toast').classList.add('visible');toastEnd=clock+3;}
-function reset(){state=newCar(start.p.x,start.p.z,yaw);lap=resetLap();keys.clear();clearInput();lastRoad=nearest(state.x,state.z);accumulator=0;camera.position.copy(start.p).add(V(-5,5,-9));if(mode==='drive')toast('Fresh lap. Make it count.');}
+function reset(){state=newCar(start.p.x,start.p.z,yaw);lap=resetLap();keys.clear();clearInput();lastRoad=nearest(state.x,state.z);resetM5StepScheduler(physicsClock);renderPrevious=captureM5RenderSnapshot(state);renderCurrent=renderPrevious;camera.position.copy(start.p).add(V(-5,5,-9));if(mode==='drive')toast('Fresh lap. Make it count.');}
 let session='attack',countdown=0;
 function startMode(next){session=next;mode='drive';paused=false;cam=0;reset();countdown=3;$('intro').hidden=true;$('hud').hidden=false;document.body.classList.add('playing');$('mode').textContent=session==='practice'?'FREE PRACTICE':'TIME ATTACK';sessionVisible(true);updateCamLabel();if(config.sound)audioToggle();}
 function updateCamLabel(){$('camera-label').textContent=['CHASE','BONNET','CINEMA'][cam];}
 function quality(){renderer.setPixelRatio(Math.min(devicePixelRatio,config.quality==='high'?2:mobile?1.25:1.5));sunlight.shadow.mapSize.setScalar(config.quality==='high'?2048:1024);if(sunlight.shadow.map){sunlight.shadow.map.dispose();sunlight.shadow.map=null;}}
-addEventListener('apex:command',e=>{const {name,value}=e.detail;if(name==='start')startMode(value);if(name==='camera'){cam=(cam+1)%3;if(cam===1){bonnetForward.set(Math.sin(state.heading),0,Math.cos(state.heading)).normalize();bonnetGrade=Math.atan2(lastRoad.d.y,Math.hypot(lastRoad.d.x,lastRoad.d.z));lastCameraTarget.copy(car.position).add(V(0,1,0)).addScaledVector(bonnetForward,22);}updateCamLabel();}if(name==='pause'){paused=value;keys.clear();clearInput();}if(name==='restart'){paused=false;reset();countdown=3;}if(name==='settings')quality();if(name==='sound')audioToggle();if(name==='exit'){mode='intro';paused=false;keys.clear();clearInput();sessionVisible(false);$('hud').hidden=true;$('countdown').hidden=true;$('intro').hidden=false;document.body.classList.remove('playing');}});quality();
+addEventListener('apex:command',e=>{const {name,value}=e.detail;if(name==='start')startMode(value);if(name==='camera'){cam=(cam+1)%3;if(cam===1){bonnetForward.set(Math.sin(state.heading),0,Math.cos(state.heading)).normalize();bonnetGrade=Math.atan2(lastRoad.d.y,Math.hypot(lastRoad.d.x,lastRoad.d.z));lastCameraTarget.copy(car.position).add(V(0,1,0)).addScaledVector(bonnetForward,22);}updateCamLabel();}if(name==='pause'){paused=value;keys.clear();clearInput();physicsClock.accumulatorS=0;prev=performance.now();}if(name==='restart'){paused=false;reset();countdown=3;}if(name==='settings')quality();if(name==='sound')audioToggle();if(name==='exit'){mode='intro';paused=false;keys.clear();clearInput();sessionVisible(false);$('hud').hidden=true;$('countdown').hidden=true;$('intro').hidden=false;document.body.classList.remove('playing');}});quality();
 addEventListener('keydown',e=>{if(document.querySelector('dialog[open]')||document.body.classList.contains('editing'))return;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();if(e.repeat)return;if(e.key.toLowerCase()==='c')$('camera').click();else if(e.key.toLowerCase()==='r'&&mode==='drive'){reset();countdown=3;}else if(e.key==='Escape'&&mode==='drive')$('pause').click();else keys.add(e.key.toLowerCase());});addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
 function suspend(){keys.clear();clearInput();if(mode==='drive'&&!paused)$('pause').click();}
 addEventListener('blur',suspend);document.addEventListener('visibilitychange',()=>{if(document.hidden)suspend();});
 let audioCtx,engineOsc,engineGain,filter,audioOn=false;async function audioToggle(){audioOn=config.sound;if(!audioOn)return;try{if(!audioCtx){audioCtx=new (window.AudioContext||window.webkitAudioContext)();engineOsc=audioCtx.createOscillator();engineOsc.type='sawtooth';filter=audioCtx.createBiquadFilter();filter.type='lowpass';filter.frequency.value=600;engineGain=audioCtx.createGain();engineGain.gain.value=0;engineOsc.connect(filter).connect(engineGain).connect(audioCtx.destination);engineOsc.start();}await audioCtx.resume();}catch{audioOn=false;}}
 const mapCtx=$('map').getContext('2d');function drawMap(t){mapCtx.clearRect(0,0,220,180);mapCtx.lineWidth=3;mapCtx.strokeStyle='#dbe5d36b';mapCtx.beginPath();samples.forEach((a,i)=>{const x=(a.p.x+320)*.22+20,y=(a.p.z+420)*.20+6;if(i)mapCtx.lineTo(x,y);else mapCtx.moveTo(x,y);});mapCtx.closePath();mapCtx.stroke();const p=at(t).p;mapCtx.fillStyle='#d5f96b';mapCtx.beginPath();mapCtx.arc((p.x+320)*.22+20,(p.z+420)*.20+6,4,0,TAU);mapCtx.fill();}
-let lastRoad=nearest(state.x,state.z),lastCameraTarget=V(),bonnetForward=V(Math.sin(state.heading),0,Math.cos(state.heading)),bonnetGrade=0,wheelSpin=0;function simulate(dt){if(mode==='drive'){if(countdown>0){countdown=Math.max(0,countdown-dt);return;}const input={steer:touchInput.steer+(keys.has('arrowright')||keys.has('d')?1:0)-(keys.has('arrowleft')||keys.has('a')?1:0),throttle:Math.max(touchInput.throttle,keys.has('arrowup')||keys.has('w')?1:0),brake:Math.max(touchInput.brake,keys.has('arrowdown')||keys.has('s')||keys.has(' ')?1:0)};lastRoad=nearest(state.x,state.z);input.steer=clamp(input.steer,-1,1);stepCar(state,input,dt,lastRoad);lastRoad=nearest(state.x,state.z);if(lastRoad.distance>14.5){const side=Math.sign(lastRoad.side);state.x=lastRoad.p.x+lastRoad.n.x*side*14.4;state.z=lastRoad.p.z+lastRoad.n.z*side*14.4;state.speed*=.65;state.heading+=wrapAngle(Math.atan2(lastRoad.d.x,lastRoad.d.z)-state.heading)*.15;setCarPose(state,state.x,state.z,state.heading,state.speed);lap.valid=false;}
- const finish=advanceLap(lap,lastRoad.t,lastRoad.distance<9,Math.abs(state.speed)>.5||lap.elapsed>0?dt:0);if(finish!==null){if(session==='attack'&&(!best||finish<best)){best=finish;try{localStorage.setItem('apex-best-v1',String(best));}catch{}$('best').textContent=fmt(best);toast('Personal best · '+fmt(best));}else toast('Lap complete · '+fmt(finish));}
-}else{const a=at(.022);state.x=a.p.x;state.z=a.p.z;state.speed=0;state.heading=Math.atan2(a.d.x,a.d.z);state.roll=state.pitch=0;lastRoad={...a,distance:0};}
+let lastRoad=nearest(state.x,state.z),lastCameraTarget=V(),bonnetForward=V(Math.sin(state.heading),0,Math.cos(state.heading)),bonnetGrade=0,wheelSpin=0;
+function simulate(dt){
+ if(mode==='drive'){
+  if(countdown>0){countdown=Math.max(0,countdown-dt);return;}
+  const keyLeft=keys.has('arrowleft')||keys.has('a'),keyRight=keys.has('arrowright')||keys.has('d');
+  const digitalSteerDirection=keyLeft===keyRight?0:keyLeft?1:-1;
+  const input={
+   digitalSteerDirection,
+   analogSteerTarget:touchInput.steer,
+   analogSteerActive:touchInput.held,
+   throttle:Math.max(touchInput.throttle,keys.has('arrowup')||keys.has('w')?1:0),
+   brake:Math.max(touchInput.brake,keys.has('arrowdown')||keys.has('s')||keys.has(' ')?1:0)
+  };
+  lastRoad=nearest(state.x,state.z);
+  stepCar(state,input,dt,lastRoad);
+  lastRoad=nearest(state.x,state.z);
+  if(lastRoad.distance>14.5){
+   const side=lastRoad.side>=0?1:-1;
+   resolveBoundaryContact(state,{
+    roadPoint:{x:lastRoad.p.x,y:lastRoad.p.y,z:lastRoad.p.z},
+    roadNormal:{x:lastRoad.n.x,y:lastRoad.n.y,z:lastRoad.n.z},
+    side,
+    distanceM:lastRoad.distance,
+    limitDistanceM:14.4
+   });
+   lastRoad=nearest(state.x,state.z);
+   lap.valid=false;
+  }
+  const finish=advanceLap(lap,lastRoad.t,lastRoad.distance<9,Math.abs(state.speed)>.5||lap.elapsed>0?dt:0);
+  if(finish!==null){
+   if(session==='attack'&&(!best||finish<best)){best=finish;try{localStorage.setItem('apex-best-v1',String(best));}catch{}$('best').textContent=fmt(best);toast('Personal best · '+fmt(finish));}
+   else toast('Lap complete · '+fmt(finish));
+  }
+ }else{
+  const a=at(.022);state.x=a.p.x;state.z=a.p.z;state.speed=0;state.heading=Math.atan2(a.d.x,a.d.z);state.roll=state.pitch=0;lastRoad={...a,distance:0};
+ }
 }
-function frame(now){requestAnimationFrame(frame);const dt=Math.min((now-prev)/1000,.06);prev=now;clock+=dt;if(!paused){accumulator+=dt;while(accumulator>=1/120){simulate(1/120);accumulator-=1/120;}const road=lastRoad;car.position.set(state.x,road.p.y+.035,state.z);car.rotation.y=state.heading;const grade=Math.atan2(road.d.y,Math.hypot(road.d.x,road.d.z));body.rotation.x=state.pitch;body.rotation.z=clamp(state.roll,-.20,.20);wheelSpin+=state.speed*dt/.369;for(const w of wheels){const ws=state.wheels?.[w.userData.index];const spin=ws?.rotationAngle??wheelSpin;w.userData.spinPivot.rotation.x=-spin;const steer=ws?.steerAngle??(w.userData.front?state.steer:0);w.rotation.y=steer;}
-const f=V(Math.sin(state.heading),0,Math.cos(state.heading)),right=V(f.z,0,-f.x),target=car.position.clone().add(V(0,1.0,0));let desired,chaseProfile=null;
+function frame(now){requestAnimationFrame(frame);const rawDt=Math.max(0,(now-prev)/1000),dt=Math.min(rawDt,.06);prev=now;clock+=dt;let renderState=renderCurrent;if(!paused){const timing=consumeM5FrameTime(physicsClock,rawDt,()=>{renderPrevious=renderCurrent;simulate(M5_FIXED_DT);renderCurrent=captureM5RenderSnapshot(state);});renderState=interpolateM5RenderSnapshots(renderPrevious,renderCurrent,timing.alpha);if(mode!=='drive'){renderState={...renderState,x:state.x,z:state.z,y:lastRoad.p.y+chassisCgLocalY+.035,yawRad:state.heading,pitchRad:0,rollRad:0,speedMs:0};}const road=nearest(renderState.x,renderState.z);car.position.set(renderState.x,renderState.y-chassisCgLocalY,renderState.z);car.rotation.y=renderState.yawRad;shadow.position.y=road.p.y+.03-car.position.y;const grade=Math.atan2(road.d.y,Math.hypot(road.d.x,road.d.z));body.rotation.x=renderState.pitchRad;body.rotation.z=clamp(renderState.rollRad,-.20,.20);wheelSpin+=renderState.speedMs*dt/.369;const wheelStateById=new Map(renderState.wheels.map(ws=>[ws.id,ws])),cy=Math.cos(renderState.yawRad),sy=Math.sin(renderState.yawRad);for(const w of wheels){const ws=wheelStateById.get(w.userData.id);if(ws){const dx=ws.hubWorldPos.x-renderState.x,dz=ws.hubWorldPos.z-renderState.z;w.position.set(cy*dx-sy*dz,ws.hubWorldPos.y-car.position.y,sy*dx+cy*dz);w.userData.spinPivot.rotation.x=-ws.rotationAngleRad;w.rotation.y=ws.steerAngleRad;/* identity-mapped equivalent of w.rotation.y=steer; */}else{w.userData.spinPivot.rotation.x=-wheelSpin;w.rotation.y=w.userData.front?renderState.steerAngleRad:0;}}
+const f=V(Math.sin(renderState.yawRad),0,Math.cos(renderState.yawRad)),right=V(f.z,0,-f.x),target=car.position.clone().add(V(0,1.0,0));let desired,chaseProfile=null;
 if(mode==='intro'){desired=target.clone().addScaledVector(f,8.8).addScaledVector(right,-8.3).add(V(0,3.0,0));target.addScaledVector(right,-3.0);camera.fov=45;}
-else if(cam===0){chaseProfile=chaseCameraProfile(state.speed);desired=target.clone().addScaledVector(f,-chaseProfile.distanceM).add(V(0,3.3,0));target.addScaledVector(f,chaseProfile.lookAheadM);camera.fov=chaseProfile.fovDeg;}
+else if(cam===0){chaseProfile=chaseCameraProfile(renderState.speedMs);desired=target.clone().addScaledVector(f,-chaseProfile.distanceM).add(V(0,3.3,0));target.addScaledVector(f,chaseProfile.lookAheadM);camera.fov=chaseProfile.fovDeg;}
 else if(cam===1){const bonnet=bonnetCameraProfile(),headingAlpha=1-Math.exp(-dt*bonnet.headingFollowRate),gradeAlpha=1-Math.exp(-dt*bonnet.gradeFollowRate);bonnetForward.lerp(f,headingAlpha).normalize();bonnetGrade+=(grade-bonnetGrade)*gradeAlpha;desired=car.position.clone().addScaledVector(bonnetForward,bonnet.mountForwardM).add(V(0,bonnet.mountHeightM,0));target.addScaledVector(bonnetForward,bonnet.lookAheadM);target.y+=bonnetGrade*bonnet.gradeLookScale;camera.fov=bonnet.fovDeg;}
 else{const phase=Math.floor(clock/9)%3;if(phase===0){desired=target.clone().addScaledVector(f,8).addScaledVector(right,-7).add(V(0,2.5,0));}else if(phase===1){desired=target.clone().addScaledVector(f,-9).addScaledVector(right,5).add(V(0,4,0));}else{desired=target.clone().addScaledVector(f,-13).addScaledVector(right,-8).add(V(0,12,0));}camera.fov=46;}
 const bonnetProfile=cam===1&&mode!=='intro'?bonnetCameraProfile():null,cameraFollowRate=bonnetProfile?bonnetProfile.positionFollowRate:cam===0&&mode!=='intro'?chaseProfile.followRate:4;camera.position.lerp(desired,1-Math.exp(-dt*cameraFollowRate));if(cam===0&&mode!=='intro'){const chaseError=camera.position.clone().sub(desired),chaseErrorLength=chaseError.length();if(chaseErrorLength>chaseProfile.maxWorldLagM)camera.position.copy(desired).addScaledVector(chaseError,chaseProfile.maxWorldLagM/chaseErrorLength);}else if(bonnetProfile){const bonnetError=camera.position.clone().sub(desired),bonnetErrorLength=bonnetError.length();if(bonnetErrorLength>bonnetProfile.maxWorldLagM)camera.position.copy(desired).addScaledVector(bonnetError,bonnetProfile.maxWorldLagM/bonnetErrorLength);}lastCameraTarget.lerp(target,1-Math.exp(-dt*(bonnetProfile?bonnetProfile.targetFollowRate:6)));camera.lookAt(lastCameraTarget);camera.updateProjectionMatrix();sunlight.target.position.copy(car.position);sunlight.position.copy(car.position).addScaledVector(sunDir,120);waterMat.uniforms.time.value=clock;}
