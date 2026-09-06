@@ -10,18 +10,18 @@ import {
  * always mean the same requested rack position. Keep the mapping fixed across
  * speed, braking, throttle, yaw and sideslip.
  *
- * The polynomial has no deadzone and keeps the center deliberately gentle:
- *   0.30 x + 0.25 x^3 + 0.45 x^5
- * Full thumb travel still reaches full mechanical rack for parking, tight
- * corners and deliberate countersteer.
+ * The fixed curve has no deadzone and keeps the center deliberately gentle:
+ *   0.30 x + 0.70 x^4.5   (applied to magnitude, then sign restored)
+ * Around 30% hand input it stays close to the proven road-speed response, while
+ * the last part of thumb travel opens progressively to full mechanical rack for
+ * parking, tight corners and deliberate countersteer.
  */
 export function racerrhiFixedTouchCurve(value: number): number {
   const raw = PhysicsMath.clamp(Number(value) || 0, -1, 1);
   const magnitude = Math.abs(raw);
   const shaped =
     0.30 * magnitude +
-    0.25 * magnitude ** 3 +
-    0.45 * magnitude ** 5;
+    0.70 * magnitude ** 4.5;
   return Math.sign(raw) * shaped;
 }
 
