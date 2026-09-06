@@ -43,7 +43,7 @@ if (!address || typeof address === 'string') throw new Error('failed to bind bro
 const url = `http://127.0.0.1:${address.port}/`;
 
 const browser = await chromium.launch({
-  headless: true,
+  headless: false,
   args: [
     '--enable-webgl',
     '--ignore-gpu-blocklist',
