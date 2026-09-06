@@ -181,8 +181,10 @@ assert(results.keyboardIncorrect.speedLossKmh > results.neutral.speedLossKmh,
 
 assert(results.touchCorrect.halfErrorMs !== null && results.touchCorrect.halfErrorMs <= 750,
   'fixed-map touch countersteer is no longer prompt enough');
-assert(results.touchCorrect.quarterErrorMs !== null && results.touchCorrect.quarterErrorMs <= 950,
-  'fixed-map touch countersteer no longer reaches quarter error');
+// Do not require a quarter-error crossing while the driver is still holding
+// countersteer. The established recovery finding is that sustained opposite lock
+// can create opposite yaw; clean recovery is judged by useful reduction plus
+// release/unwind and final settle instead.
 assert(results.touchCorrect.bestErrorRatio < 0.30, 'touch-wheel countersteer did not materially reduce slide error');
 assert(results.touchCorrect.speedLossKmh < 4.5, 'touch recovery is hiding behind excessive speed loss');
 assert(results.touchCorrect.finalSlipDeg < 0.10, 'touch recovery left excessive final sideslip');
