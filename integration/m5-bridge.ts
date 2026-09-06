@@ -304,33 +304,59 @@ function hydrate(target: M5CarState, sim: Simulation, raw: VehicleState = sim.ve
   };
   target.absActive = Boolean(raw.absActive);
   target.tcsActive = Boolean(raw.tcsActive);
-  target.wheels = raw.wheels.map((wheel) => ({
-    id: wheelId(wheel.id),
-    isFront: Boolean(wheel.isFront),
-    isLeft: Boolean(wheel.isLeft),
-    steerAngleRad: finite(wheel.steerAngle),
-    rotationAngleRad: finite(wheel.rotationAngle),
-    angularVelocityRadS: finite(wheel.angularVelocity),
-    wheelSpeedMs: finite(wheel.angularVelocity) * M5_CONFIG.wheelRadius,
-    suspensionCompression: finite(wheel.suspensionCompression),
-    verticalTravelM: finite(wheel.verticalTravelM),
-    normalLoadN: finite(wheel.forceVectorNorm),
-    contactState: wheel.isAirborne ? 'airborne' : 'contact',
-    hubWorldPos: vec3(wheel.hubWorldPos),
-    groundContactPos: vec3(wheel.groundContactPos),
-    surfaceType: String(wheel.surfaceType),
-    surfaceFriction: finite(wheel.surfaceFriction),
-    slipAngleRad: finite(wheel.slipAngle),
-    slipRatio: finite(wheel.slipRatio),
-    forceLongitudinalN: finite(wheel.forceVectorLong),
-    forceLateralN: finite(wheel.forceVectorLat),
-    frictionLimitN: finite(wheel.frictionLimitN),
-    gripUtilization: finite(wheel.gripUtilization),
-    temperatureC: finite(wheel.temperature),
-    wearPercent: finite(wheel.tireWearPercent),
-    absActive: Boolean(wheel.absActive),
-    tcsActive: Boolean(wheel.tcsActive),
-  }));
+  target.wheels = raw.wheels.map((wheel, index) => {
+    const suspensionState = sim.vehicle.suspension.states[index];
+    const physicalContact = suspensionState?.contactPointWorld;
+
+    // Racing26's SuspensionKinematicsAdapter decorates getState() wheel coordinates
+    // with a small control-arm migration for its own presentation/debug telemetry.
+    // The actual Racerrhi tire shear/support point remains suspension.contactPointWorld.
+    // Rendering the decorated X/Z here made the wheel meshes migrate laterally under
+    // load transfer while the chassis and tire forces stayed on the physical support
+    // line, which looked like the body sliding left/right off the wheels in corners.
+    // Keep the donor steering/camber kinematics, but bind Racerrhi's visible wheel
+    // centers to the exact support coordinates used by the physics solver.
+    const rawHub = vec3(wheel.hubWorldPos);
+    const rawContact = vec3(wheel.groundContactPos);
+    const hubWorldPos = {
+      x: finite(physicalContact?.x, rawHub.x),
+      y: finite(suspensionState?.hubPositionWorldY, rawHub.y),
+      z: finite(physicalContact?.z, rawHub.z),
+    };
+    const groundContactPos = {
+      x: finite(physicalContact?.x, rawContact.x),
+      y: finite(physicalContact?.y, rawContact.y),
+      z: finite(physicalContact?.z, rawContact.z),
+    };
+
+    return {
+      id: wheelId(wheel.id),
+      isFront: Boolean(wheel.isFront),
+      isLeft: Boolean(wheel.isLeft),
+      steerAngleRad: finite(wheel.steerAngle),
+      rotationAngleRad: finite(wheel.rotationAngle),
+      angularVelocityRadS: finite(wheel.angularVelocity),
+      wheelSpeedMs: finite(wheel.angularVelocity) * M5_CONFIG.wheelRadius,
+      suspensionCompression: finite(wheel.suspensionCompression),
+      verticalTravelM: finite(wheel.verticalTravelM),
+      normalLoadN: finite(wheel.forceVectorNorm),
+      contactState: wheel.isAirborne ? 'airborne' : 'contact',
+      hubWorldPos,
+      groundContactPos,
+      surfaceType: String(wheel.surfaceType),
+      surfaceFriction: finite(wheel.surfaceFriction),
+      slipAngleRad: finite(wheel.slipAngle),
+      slipRatio: finite(wheel.slipRatio),
+      forceLongitudinalN: finite(wheel.forceVectorLong),
+      forceLateralN: finite(wheel.forceVectorLat),
+      frictionLimitN: finite(wheel.frictionLimitN),
+      gripUtilization: finite(wheel.gripUtilization),
+      temperatureC: finite(wheel.temperature),
+      wearPercent: finite(wheel.tireWearPercent),
+      absActive: Boolean(wheel.absActive),
+      tcsActive: Boolean(wheel.tcsActive),
+    };
+  });
   return target;
 }
 
