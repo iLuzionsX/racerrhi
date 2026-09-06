@@ -184,9 +184,13 @@ await mobilePage.evaluate(() => {
     const target = event.target instanceof Element
       ? (event.target.id || event.target.closest?.('[id]')?.id || event.target.tagName)
       : 'unknown';
+    const control = event.target instanceof Element
+      ? (event.target.closest?.('#wheel,#gas,#brake')?.id || null)
+      : null;
     globalThis.__pointerTrace.push({
       type: event.type,
       target,
+      control,
       pointerId: event.pointerId,
       pointerType: event.pointerType,
       isPrimary: event.isPrimary,
@@ -209,7 +213,7 @@ await mobilePage.evaluate(() => {
 });
 
 const readUiState = () => mobilePage.evaluate(async () => {
-  const { input } = await import('./ui.js');
+  const { input } = await import('./ui.js?v=4');
   const wheel = document.getElementById('wheel');
   return {
     ...input,
@@ -317,7 +321,7 @@ const otherPoint = (sourceId) => tp(ox, oy, sourceId);
 
 async function activeWheelPointerId() {
   const trace = await readPointerTrace();
-  const down = [...trace].reverse().find((entry) => entry.type === 'pointerdown' && entry.target === 'wheel');
+  const down = [...trace].reverse().find((entry) => entry.type === 'pointerdown' && entry.control === 'wheel');
   if (!down) throw new Error('trusted wheel pointerdown was not observed: ' + JSON.stringify(trace.slice(-20)));
   if (!down.isTrusted || down.pointerType !== 'touch') {
     throw new Error('wheel input was not a trusted browser touch pointer: ' + JSON.stringify(down));
@@ -340,13 +344,13 @@ const mobileResults = {};
 // Normal release: input ownership must clear immediately; visual recenter is tracked separately.
 await clearPointerTrace();
 await touch('touchStart', [wheelPoint(1)]);
-await waitUi(async () => (await import('./ui.js')).input.held === true, 'wheel did not enter held state');
+await waitUi(async () => (await import('./ui.js?v=4')).input.held === true, 'wheel did not enter held state');
 const normalPointerId = await activeWheelPointerId();
 await touch('touchMove', [wheelPoint(1, true)]);
-await waitUi(async () => Math.abs((await import('./ui.js')).input.steer) > 0.10, 'wheel move did not create steering request');
+await waitUi(async () => Math.abs((await import('./ui.js?v=4')).input.steer) > 0.10, 'wheel move did not create steering request');
 const normalBeforeRelease = await readUiState();
 await touch('touchEnd');
-await waitUi(async () => (await import('./ui.js')).input.held === false, 'normal wheel release left input held');
+await waitUi(async () => (await import('./ui.js?v=4')).input.held === false, 'normal wheel release left input held');
 const normalAfterRelease = await readUiState();
 const normalTrace = await readPointerTrace();
 const normalUp = normalTrace.find((entry) => entry.type === 'pointerup' && entry.pointerId === normalPointerId);
@@ -362,13 +366,13 @@ mobileResults.normalRelease = {
 // Release outside the wheel must still clear the captured steering owner.
 await clearPointerTrace();
 await touch('touchStart', [wheelPoint(2)]);
-await waitUi(async () => (await import('./ui.js')).input.held === true, 'outside-release wheel did not enter held state');
+await waitUi(async () => (await import('./ui.js?v=4')).input.held === true, 'outside-release wheel did not enter held state');
 const outsidePointerId = await activeWheelPointerId();
 await touch('touchMove', [tp(wheelOutsideX, wheelOutsideY, 2)]);
 await touch('touchEnd');
-await waitUi(async () => (await import('./ui.js')).input.held === false, 'release outside wheel left steering held');
+await waitUi(async () => (await import('./ui.js?v=4')).input.held === false, 'release outside wheel left steering held');
 const outsideTrace = await readPointerTrace();
-if (!outsideTrace.some((entry) => entry.type === 'pointerup' && entry.pointerId === outsidePointerId && entry.target === 'wheel')) {
+if (!outsideTrace.some((entry) => entry.type === 'pointerup' && entry.pointerId === outsidePointerId && entry.control === 'wheel')) {
   throw new Error('captured outside release was not delivered back to wheel: ' + JSON.stringify(outsideTrace));
 }
 mobileResults.outsideRelease = {
@@ -381,12 +385,12 @@ mobileResults.outsideRelease = {
 // Cancellation may leave a decaying visual/request value, but it must release analog ownership.
 await clearPointerTrace();
 await touch('touchStart', [wheelPoint(3)]);
-await waitUi(async () => (await import('./ui.js')).input.held === true, 'cancel wheel did not enter held state');
+await waitUi(async () => (await import('./ui.js?v=4')).input.held === true, 'cancel wheel did not enter held state');
 const cancelPointerId = await activeWheelPointerId();
 await touch('touchMove', [wheelPoint(3, true)]);
-await waitUi(async () => Math.abs((await import('./ui.js')).input.steer) > 0.10, 'cancel setup did not create steering request');
+await waitUi(async () => Math.abs((await import('./ui.js?v=4')).input.steer) > 0.10, 'cancel setup did not create steering request');
 await touch('touchCancel');
-await waitUi(async () => (await import('./ui.js')).input.held === false, 'pointercancel left analog steering ownership held');
+await waitUi(async () => (await import('./ui.js?v=4')).input.held === false, 'pointercancel left analog steering ownership held');
 const cancelTrace = await readPointerTrace();
 if (!cancelTrace.some((entry) => entry.type === 'pointercancel' && entry.pointerId === cancelPointerId)) {
   throw new Error('trusted pointercancel was not observed for wheel: ' + JSON.stringify(cancelTrace));
@@ -401,11 +405,11 @@ mobileResults.cancel = {
 // Unexpected capture loss must be idempotent and release only the captured wheel owner.
 await clearPointerTrace();
 await touch('touchStart', [wheelPoint(4)]);
-await waitUi(async () => (await import('./ui.js')).input.held === true, 'capture-loss wheel did not enter held state');
+await waitUi(async () => (await import('./ui.js?v=4')).input.held === true, 'capture-loss wheel did not enter held state');
 const lostPointerId = await activeWheelPointerId();
 await touch('touchMove', [wheelPoint(4, true)]);
 await wheel.evaluate((el, pointerId) => el.releasePointerCapture(pointerId), lostPointerId);
-await waitUi(async () => (await import('./ui.js')).input.held === false, 'lostpointercapture left analog steering ownership held');
+await waitUi(async () => (await import('./ui.js?v=4')).input.held === false, 'lostpointercapture left analog steering ownership held');
 const lostTraceBeforeEnd = await readPointerTrace();
 if (!lostTraceBeforeEnd.some((entry) => entry.type === 'lostpointercapture' && entry.pointerId === lostPointerId)) {
   throw new Error('browser did not emit lostpointercapture for released wheel capture: ' + JSON.stringify(lostTraceBeforeEnd));
@@ -422,13 +426,13 @@ mobileResults.captureLoss = {
 // Remove gas first; wheel must remain held and captured.
 await clearPointerTrace();
 await touch('touchStart', [wheelPoint(5)]);
-await waitUi(async () => (await import('./ui.js')).input.held === true, 'multitouch wheel did not enter held state');
+await waitUi(async () => (await import('./ui.js?v=4')).input.held === true, 'multitouch wheel did not enter held state');
 const wheelGasPointerId = await activeWheelPointerId();
 await touch('touchStart', [wheelPoint(5), gasPoint(6)]);
 await waitUi(() => document.getElementById('gas')?.classList.contains('active') === true, 'second-finger gas did not activate');
 const gasPointerId = await activePedalPointerId(gas, 'gas');
 await touch('touchMove', [wheelPoint(5, true), gasPoint(6)]);
-await waitUi(async () => Math.abs((await import('./ui.js')).input.steer) > 0.10, 'multitouch wheel did not steer');
+await waitUi(async () => Math.abs((await import('./ui.js?v=4')).input.steer) > 0.10, 'multitouch wheel did not steer');
 await touch('touchMove', [wheelPoint(5, true)]);
 await waitUi(() => document.getElementById('gas')?.classList.contains('active') === false, 'releasing gas first did not clear gas');
 const wheelStillHeldAfterGasRelease = await readUiState();
@@ -437,7 +441,7 @@ if (!(await wheel.evaluate((el, pointerId) => el.hasPointerCapture(pointerId), w
   throw new Error('releasing gas first stole wheel pointer capture');
 }
 await touch('touchEnd');
-await waitUi(async () => (await import('./ui.js')).input.held === false, 'final wheel release after gas left steering held');
+await waitUi(async () => (await import('./ui.js?v=4')).input.held === false, 'final wheel release after gas left steering held');
 mobileResults.gasReleasedFirst = {
   wheelPointerId: wheelGasPointerId,
   gasPointerId,
@@ -452,11 +456,11 @@ await touch('touchStart', [gasPoint(7)]);
 await waitUi(() => document.getElementById('gas')?.classList.contains('active') === true, 'gas-first setup did not activate gas');
 const gasFirstPointerId = await activePedalPointerId(gas, 'gas');
 await touch('touchStart', [gasPoint(7), wheelPoint(8)]);
-await waitUi(async () => (await import('./ui.js')).input.held === true, 'second-finger wheel did not acquire steering');
+await waitUi(async () => (await import('./ui.js?v=4')).input.held === true, 'second-finger wheel did not acquire steering');
 const wheelSecondPointerId = await activeWheelPointerId();
 await touch('touchMove', [gasPoint(7), wheelPoint(8, true)]);
 await touch('touchMove', [gasPoint(7)]);
-await waitUi(async () => (await import('./ui.js')).input.held === false, 'releasing wheel first left analog steering held');
+await waitUi(async () => (await import('./ui.js?v=4')).input.held === false, 'releasing wheel first left analog steering held');
 if (!(await gas.evaluate((el) => el.classList.contains('active')))) throw new Error('releasing wheel first cleared gas pedal');
 if (!(await gas.evaluate((el, pointerId) => el.hasPointerCapture(pointerId), gasFirstPointerId))) {
   throw new Error('releasing wheel first stole gas pointer capture');
@@ -473,16 +477,16 @@ mobileResults.wheelReleasedFirst = {
 // An unrelated second finger disappearing must not clear wheel ownership.
 await clearPointerTrace();
 await touch('touchStart', [wheelPoint(9)]);
-await waitUi(async () => (await import('./ui.js')).input.held === true, 'unrelated-finger setup did not hold wheel');
+await waitUi(async () => (await import('./ui.js?v=4')).input.held === true, 'unrelated-finger setup did not hold wheel');
 const unrelatedWheelPointerId = await activeWheelPointerId();
 await touch('touchStart', [wheelPoint(9), otherPoint(10)]);
 await touch('touchMove', [wheelPoint(9)]);
-await waitUi(async () => (await import('./ui.js')).input.held === true, 'unrelated finger release cleared wheel ownership');
+await waitUi(async () => (await import('./ui.js?v=4')).input.held === true, 'unrelated finger release cleared wheel ownership');
 if (!(await wheel.evaluate((el, pointerId) => el.hasPointerCapture(pointerId), unrelatedWheelPointerId))) {
   throw new Error('unrelated finger release lost wheel capture');
 }
 await touch('touchEnd');
-await waitUi(async () => (await import('./ui.js')).input.held === false, 'wheel stayed held after unrelated-finger scenario cleanup');
+await waitUi(async () => (await import('./ui.js?v=4')).input.held === false, 'wheel stayed held after unrelated-finger scenario cleanup');
 mobileResults.unrelatedFingerRelease = {
   wheelPointerId: unrelatedWheelPointerId,
   visual: await visualRecenter('unrelated-finger wheel release'),
@@ -492,17 +496,17 @@ mobileResults.unrelatedFingerRelease = {
 // Immediate release and re-grab must create a new browser pointer lifecycle cleanly.
 await clearPointerTrace();
 await touch('touchStart', [wheelPoint(11)]);
-await waitUi(async () => (await import('./ui.js')).input.held === true, 'first re-grab touch did not hold wheel');
+await waitUi(async () => (await import('./ui.js?v=4')).input.held === true, 'first re-grab touch did not hold wheel');
 const firstGrabPointerId = await activeWheelPointerId();
 await touch('touchEnd');
-await waitUi(async () => (await import('./ui.js')).input.held === false, 'first re-grab release stayed held');
+await waitUi(async () => (await import('./ui.js?v=4')).input.held === false, 'first re-grab release stayed held');
 await touch('touchStart', [wheelPoint(12)]);
-await waitUi(async () => (await import('./ui.js')).input.held === true, 'immediate second grab did not hold wheel');
+await waitUi(async () => (await import('./ui.js?v=4')).input.held === true, 'immediate second grab did not hold wheel');
 const secondGrabPointerId = await activeWheelPointerId();
 await touch('touchMove', [wheelPoint(12, true)]);
-await waitUi(async () => Math.abs((await import('./ui.js')).input.steer) > 0.10, 'second grab did not regain steering');
+await waitUi(async () => Math.abs((await import('./ui.js?v=4')).input.steer) > 0.10, 'second grab did not regain steering');
 await touch('touchEnd');
-await waitUi(async () => (await import('./ui.js')).input.held === false, 'second re-grab release stayed held');
+await waitUi(async () => (await import('./ui.js?v=4')).input.held === false, 'second re-grab release stayed held');
 mobileResults.regrab = {
   firstPointerId: firstGrabPointerId,
   secondPointerId: secondGrabPointerId,
@@ -525,7 +529,7 @@ await mobilePage.waitForFunction(() => document.getElementById('countdown')?.hid
 await mobilePage.keyboard.down('ArrowLeft');
 await clearPointerTrace();
 await touch('touchStart', [wheelPoint(14)]);
-await waitUi(async () => (await import('./ui.js')).input.held === true, 'keyboard-handoff touch did not hold wheel');
+await waitUi(async () => (await import('./ui.js?v=4')).input.held === true, 'keyboard-handoff touch did not hold wheel');
 await touch('touchMove', [wheelPoint(14, true)]);
 await mobilePage.waitForFunction(() => {
   const d = globalThis.__racerrhiDiagnostics?.lastPhysicsInput;
@@ -533,7 +537,7 @@ await mobilePage.waitForFunction(() => {
 }, null, { timeout: 2500 });
 const physicsDuringTouchAndKey = await readPhysicsInput();
 await touch('touchEnd');
-await waitUi(async () => (await import('./ui.js')).input.held === false, 'touch release while key held left analog owner active');
+await waitUi(async () => (await import('./ui.js?v=4')).input.held === false, 'touch release while key held left analog owner active');
 await mobilePage.waitForFunction(() => {
   const d = globalThis.__racerrhiDiagnostics?.lastPhysicsInput;
   return d &&
@@ -558,7 +562,7 @@ mobileResults.keyboardHandoff = {
 // report that environment limitation instead of fabricating a visibility event.
 await clearPointerTrace();
 await touch('touchStart', [wheelPoint(15)]);
-await waitUi(async () => (await import('./ui.js')).input.held === true, 'focus-loss setup did not hold wheel');
+await waitUi(async () => (await import('./ui.js?v=4')).input.held === true, 'focus-loss setup did not hold wheel');
 await touch('touchMove', [wheelPoint(15, true)]);
 const coverPage = await mobile.newPage();
 await coverPage.goto('about:blank');
@@ -571,7 +575,7 @@ try {
 }
 if (visibilityLossObserved) {
   await waitUi(async () => {
-    const { input } = await import('./ui.js');
+    const { input } = await import('./ui.js?v=4');
     return input.held === false && input.steer === 0 && input.throttle === 0 && input.brake === 0;
   }, 'visibility loss did not clear mobile controls');
 }
@@ -583,7 +587,7 @@ if (visibilityLossObserved) {
 } else {
   // Clean up the still-active trusted source because xvfb did not hide the page.
   await touch('touchEnd');
-  await waitUi(async () => (await import('./ui.js')).input.held === false, 'focus-loss fallback cleanup left wheel held');
+  await waitUi(async () => (await import('./ui.js?v=4')).input.held === false, 'focus-loss fallback cleanup left wheel held');
 }
 await coverPage.close();
 mobileResults.visibilityLoss = {
