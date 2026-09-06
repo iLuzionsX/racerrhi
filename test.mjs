@@ -10,7 +10,7 @@ assert.equal(sanitize({}).wheelMode,'drag');
 assert.equal(sanitize({wheelMode:'rotate',wheelX:.4}).wheelMode,'rotate');
 assert.equal(sanitize({wheelMode:'invalid'}).wheelMode,'drag');
 for(const width of [140,210,300])for(const sensitivity of [.6,1,1.5]){
-  const stroke=width*.55/sensitivity;
+  const stroke=width*.45/sensitivity;
   assert(Math.abs(thumbSteer(0,stroke,width,sensitivity)-1)<1e-12);
   assert(Math.abs(thumbSteer(0,-stroke,width,sensitivity)+1)<1e-12);
   let fine=0;for(let i=0;i<20;i++)fine=thumbSteer(fine,stroke/40,width,sensitivity);
@@ -19,7 +19,7 @@ for(const width of [140,210,300])for(const sensitivity of [.6,1,1.5]){
   const full=thumbSteer(0,stroke*4,width,sensitivity);
   assert(thumbSteer(full,-stroke*.05,width,sensitivity)<.96,'overtravel delayed reversal');
 }
-console.log('PASS thumb travel, sensitivity, event-rate independence and immediate unwind');
+assert.equal(thumbSteer(0,210*.45,210,1),1);assert.equal(thumbSteer(0,-210*.45,210,1),-1);console.log('PASS thumb travel, edge-reachable full lock, sensitivity, event-rate independence and immediate unwind');
 
 
 import {newCar,stepCar,setCarPose,getM5PhysicsMetadata,advanceLap} from './dist/physics.mjs';
@@ -54,9 +54,9 @@ const chassisCgDeclaration=gameSource.indexOf('const chassisCgLocalY=.52-.035'),
 const indexSource=fs.readFileSync(new URL('./dist/index.html',import.meta.url),'utf8');
 const uiSource=fs.readFileSync(new URL('./dist/ui.js',import.meta.url),'utf8');
 assert(gameSource.includes('w.rotation.y=ws.steerAngleRad;'));assert(!gameSource.includes('w.rotation.y=-steer;'));assert(gameSource.includes('wheelStateById.get(w.userData.id)'));console.log('PASS M5 render steering sign and wheel identity match vehicle physics');
-assert(indexSource.includes('maximum-scale=1,user-scalable=no'));assert(indexSource.includes('./ui.js?v=5')&&indexSource.includes('./game.js?v=11'));assert(uiSource.includes("document.addEventListener('touchend'")&&uiSource.includes("{passive:false}"));console.log('PASS Mobile Safari double-tap zoom suppression and cache-busted controls');
+assert(indexSource.includes('maximum-scale=1,user-scalable=no'));assert(indexSource.includes('./ui.js?v=6')&&indexSource.includes('./game.js?v=12'));assert(uiSource.includes("document.addEventListener('touchend'")&&uiSource.includes("{passive:false}"));console.log('PASS Mobile Safari double-tap zoom suppression and cache-busted controls');
 
-assert(uiSource.includes("'gesturestart','gesturechange','gestureend'"));assert(uiSource.includes("e.touches.length>1")&&uiSource.includes("document.addEventListener('touchmove'"));assert(indexSource.includes('./ui.js?v=5')&&indexSource.includes('./game.js?v=11'));assert(gameSource.includes("./ui.js?v=5"));console.log('PASS Mobile Safari pinch zoom suppression and synchronized UI module cache bust');
+assert(uiSource.includes('input.held=false;input.steer=0'));assert(uiSource.includes("'gesturestart','gesturechange','gestureend'"));assert(uiSource.includes("e.touches.length>1")&&uiSource.includes("document.addEventListener('touchmove'"));assert(indexSource.includes('./ui.js?v=6')&&indexSource.includes('./game.js?v=12'));assert(gameSource.includes("./ui.js?v=6"));console.log('PASS Mobile Safari pinch zoom suppression and synchronized UI module cache bust');
 
 assert(gameSource.includes("d=a.d.clone().lerp(b.d,u).normalize()"));assert(gameSource.includes("n=a.n.clone().lerp(b.n,u).normalize()"));console.log('PASS Racerrhi road tangent/normal interpolation for M5 suspension continuity');
 
