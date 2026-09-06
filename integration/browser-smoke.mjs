@@ -137,7 +137,29 @@ const desktopSpeed = Number((await desktopPage.locator('#speed').textContent()) 
 await desktopPage.keyboard.up('ArrowLeft');
 await desktopPage.keyboard.up('ArrowUp');
 if (!(desktopSpeed > 0)) throw new Error('keyboard throttle did not move the car after countdown');
-if (desktopErrors.length) throw new Error('desktop startup errors: ' + desktopErrors.join(' | '));
+
+// Exercise session state transitions in the same real browser that rendered and drove.
+await desktopPage.click('#pause');
+await desktopPage.waitForFunction(() => document.getElementById('pause-dialog')?.open === true);
+await desktopPage.click('#resume');
+await desktopPage.waitForFunction(() => document.getElementById('pause-dialog')?.open === false);
+await desktopPage.click('#pause');
+await desktopPage.waitForFunction(() => document.getElementById('pause-dialog')?.open === true);
+await desktopPage.click('#restart');
+await desktopPage.waitForFunction(() =>
+  document.getElementById('pause-dialog')?.open === false &&
+  !document.getElementById('countdown')?.hidden
+);
+await desktopPage.click('#pause');
+await desktopPage.waitForFunction(() => document.getElementById('pause-dialog')?.open === true);
+await desktopPage.click('#exit');
+await desktopPage.waitForFunction(() =>
+  document.getElementById('intro')?.hidden === false &&
+  document.getElementById('hud')?.hidden === true &&
+  document.getElementById('pause-dialog')?.open === false
+);
+const desktopCanvasAfterExit = await assertRenderableCanvas(desktopPage);
+if (desktopErrors.length) throw new Error('desktop startup/session errors: ' + desktopErrors.join(' | '));
 
 const mobile = await browser.newContext({
   viewport: { width: 390, height: 640 },
@@ -202,6 +224,8 @@ console.log(JSON.stringify({
   desktop: {
     canvas: desktopCanvas,
     keyboardSpeedKmhAfterInput: desktopSpeed,
+    sessionTransitions: 'pause/resume, restart, return-to-intro passed',
+    canvasAfterReturnToIntro: desktopCanvasAfterExit,
   },
   mobile: {
     canvas: mobileCanvas,
