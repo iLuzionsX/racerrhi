@@ -160,9 +160,11 @@ await desktopPage.waitForFunction(() =>
 );
 const desktopCanvasAfterExit = await assertRenderableCanvas(desktopPage);
 if (desktopErrors.length) throw new Error('desktop startup/session errors: ' + desktopErrors.join(' | '));
+await desktop.close();
 
 const mobile = await browser.newContext({
   viewport: { width: 390, height: 640 },
+  screen: { width: 390, height: 640 },
   isMobile: true,
   hasTouch: true,
   deviceScaleFactor: 1,
@@ -236,7 +238,6 @@ console.log(JSON.stringify({
   status: 'passed',
 }, null, 2));
 
-await desktop.close();
 await mobile.close();
 await browser.close();
 await new Promise((resolve) => server.close(resolve));
