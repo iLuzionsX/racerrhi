@@ -130,40 +130,59 @@ assert(leftTurn.peakSlip < .45 && rightTurn.peakSlip < .45, 'first-turn sideslip
 assert(Math.abs(leftTurn.peakYaw-rightTurn.peakYaw) / Math.max(.01,leftTurn.peakYaw,rightTurn.peakYaw) < .15,
   'left/right yaw response lost symmetry');
 
-// Racerrhi renders each wheel from bridge hubWorldPos. Those coordinates must be
-// the exact support/contact coordinates used by Vehicle/Suspension, not the donor
-// state adapter's extra presentation-only control-arm migration.
+function endOfStepSupportWorld(sim:any,index:number) {
+  const hardpoint = sim.vehicle.getHardpointsBody()[index];
+  const supportBody = PhysicsMath.vec3(
+    hardpoint.x,
+    sim.vehicle.planarSupportBodyYByCorner[index],
+    hardpoint.z,
+  );
+  return PhysicsMath.vec3Add(
+    sim.vehicle.rigidBody.position,
+    PhysicsMath.quatRotateVec3(sim.vehicle.rigidBody.orientation,supportBody),
+  );
+}
+
+// Racerrhi renders each wheel from bridge hubWorldPos. Suspension contactPointWorld
+// is a force-evaluation coordinate from the beginning of the fixed step; the bridge
+// must instead expose the same support line reconstructed at the current t + dt
+// chassis pose so fast motion cannot leave the wheel meshes one step behind.
 function wheelSupportAlignment(turn:{state:any}) {
   const state = turn.state;
   const sim:any = state._m5;
   const decorated = sim.vehicle.getState();
   let maxDecoratedMigrationM = 0;
-  let maxBridgeSupportErrorM = 0;
+  let maxCurrentSupportErrorM = 0;
+  let maxStaleContactLagM = 0;
 
   state.wheels.forEach((wheel:any,index:number)=>{
     const susp = sim.vehicle.suspension.states[index];
-    const physical = susp.contactPointWorld;
+    const stalePhysical = susp.contactPointWorld;
+    const currentSupport = endOfStepSupportWorld(sim,index);
     const bridgeError = Math.hypot(
-      wheel.hubWorldPos.x - physical.x,
-      wheel.hubWorldPos.z - physical.z,
+      wheel.hubWorldPos.x - currentSupport.x,
+      wheel.hubWorldPos.z - currentSupport.z,
     );
-    maxBridgeSupportErrorM = Math.max(maxBridgeSupportErrorM, bridgeError);
-    assert(bridgeError < 1e-9, wheel.id+' rendered hub left the physical tire support line');
+    maxCurrentSupportErrorM = Math.max(maxCurrentSupportErrorM, bridgeError);
+    maxStaleContactLagM = Math.max(
+      maxStaleContactLagM,
+      Math.hypot(currentSupport.x-stalePhysical.x,currentSupport.z-stalePhysical.z),
+    );
+    assert(bridgeError < 1e-9, wheel.id+' rendered hub lagged the current chassis support line');
     assert(near(wheel.hubWorldPos.y,susp.hubPositionWorldY,1e-9), wheel.id+' rendered hub height diverged from unsprung state');
-    assert(near(wheel.groundContactPos.x,physical.x,1e-9));
-    assert(near(wheel.groundContactPos.y,physical.y,1e-9));
-    assert(near(wheel.groundContactPos.z,physical.z,1e-9));
+    assert(near(wheel.groundContactPos.x,currentSupport.x,1e-9));
+    assert(near(wheel.groundContactPos.z,currentSupport.z,1e-9));
 
     const donorHub = decorated.wheels[index]?.hubWorldPos;
     if(donorHub) {
       maxDecoratedMigrationM = Math.max(
         maxDecoratedMigrationM,
-        Math.hypot(donorHub.x-physical.x,donorHub.z-physical.z),
+        Math.hypot(donorHub.x-stalePhysical.x,donorHub.z-stalePhysical.z),
       );
     }
   });
 
-  return { maxDecoratedMigrationM, maxBridgeSupportErrorM };
+  return { maxDecoratedMigrationM, maxCurrentSupportErrorM, maxStaleContactLagM };
 }
 const leftWheelSupport = wheelSupportAlignment(leftTurn);
 const rightWheelSupport = wheelSupportAlignment(rightTurn);
@@ -179,6 +198,7 @@ function highSpeedTurnProbe(direction:-1|1) {
   let peakSlipRad = 0;
   let maxLocalLateralDeviationM = 0;
   let maxLocalLongitudinalDeviationM = 0;
+  let maxStaleContactLagM = 0;
   const staticById:any = {
     FL:{x:.842,z:1.367}, FR:{x:-.842,z:1.367},
     RL:{x:.830,z:-1.638}, RR:{x:-.830,z:-1.638},
@@ -200,6 +220,8 @@ function highSpeedTurnProbe(direction:-1|1) {
       const localZ=sy*dx+cy*dz;
       maxLocalLateralDeviationM=Math.max(maxLocalLateralDeviationM,Math.abs(localX-nominal.x));
       maxLocalLongitudinalDeviationM=Math.max(maxLocalLongitudinalDeviationM,Math.abs(localZ-nominal.z));
+      const stale=(state as any)._m5.vehicle.suspension.states[wheel.id==='FL'?0:wheel.id==='FR'?1:wheel.id==='RL'?2:3].contactPointWorld;
+      maxStaleContactLagM=Math.max(maxStaleContactLagM,Math.hypot(wheel.hubWorldPos.x-stale.x,wheel.hubWorldPos.z-stale.z));
     }
   }
 
@@ -210,11 +232,18 @@ function highSpeedTurnProbe(direction:-1|1) {
     peakSlipRad,
     maxLocalLateralDeviationM,
     maxLocalLongitudinalDeviationM,
+    maxStaleContactLagM,
     finalSpeedKmh:state.speed*3.6,
   };
 }
 const highSpeedLeft=highSpeedTurnProbe(1);
 const highSpeedRight=highSpeedTurnProbe(-1);
+for(const probe of [highSpeedLeft,highSpeedRight]) {
+  assert(probe.finalSpeedKmh > 150, 'high-speed wheel sync probe fell below 150 km/h');
+  assert(probe.maxLocalLongitudinalDeviationM < .08, 'rendered wheel centers still trail the chassis fore/aft above 150 km/h');
+  assert(probe.maxLocalLateralDeviationM < .08, 'rendered wheel centers still leave the chassis laterally above 150 km/h');
+  assert(probe.maxStaleContactLagM > .25, 'probe no longer demonstrates the beginning-of-step contact lag it is guarding against');
+}
 
 // -----------------------------------------------------------------------------
 // 3) Sustained corner -> lift -> brake -> throttle exit remains progressive.
@@ -570,8 +599,10 @@ console.log(JSON.stringify({
   wheelSupportSync:{
     leftTurnDecoratedMigrationMm:leftWheelSupport.maxDecoratedMigrationM*1000,
     rightTurnDecoratedMigrationMm:rightWheelSupport.maxDecoratedMigrationM*1000,
-    leftTurnBridgeSupportErrorMm:leftWheelSupport.maxBridgeSupportErrorM*1000,
-    rightTurnBridgeSupportErrorMm:rightWheelSupport.maxBridgeSupportErrorM*1000,
+    leftTurnCurrentSupportErrorMm:leftWheelSupport.maxCurrentSupportErrorM*1000,
+    rightTurnCurrentSupportErrorMm:rightWheelSupport.maxCurrentSupportErrorM*1000,
+    leftTurnStaleContactLagMm:leftWheelSupport.maxStaleContactLagM*1000,
+    rightTurnStaleContactLagMm:rightWheelSupport.maxStaleContactLagM*1000,
   },
   highSpeedTurnProbe:{
     left:{
@@ -582,6 +613,7 @@ console.log(JSON.stringify({
       peakSideslipDeg:highSpeedLeft.peakSlipRad*180/Math.PI,
       maxLocalLateralDeviationMm:highSpeedLeft.maxLocalLateralDeviationM*1000,
       maxLocalLongitudinalDeviationMm:highSpeedLeft.maxLocalLongitudinalDeviationM*1000,
+      staleContactLagMm:highSpeedLeft.maxStaleContactLagM*1000,
       finalSpeedKmh:highSpeedLeft.finalSpeedKmh,
     },
     right:{
@@ -592,6 +624,7 @@ console.log(JSON.stringify({
       peakSideslipDeg:highSpeedRight.peakSlipRad*180/Math.PI,
       maxLocalLateralDeviationMm:highSpeedRight.maxLocalLateralDeviationM*1000,
       maxLocalLongitudinalDeviationMm:highSpeedRight.maxLocalLongitudinalDeviationM*1000,
+      staleContactLagMm:highSpeedRight.maxStaleContactLagM*1000,
       finalSpeedKmh:highSpeedRight.finalSpeedKmh,
     },
     renderRollClampDeg:.20*180/Math.PI,
