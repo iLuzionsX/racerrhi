@@ -181,13 +181,17 @@ const gasBox = await gas.boundingBox();
 if (!gasBox) throw new Error('mobile gas pedal has no layout box');
 const gx = gasBox.x + gasBox.width / 2;
 const gy = gasBox.y + gasBox.height / 2;
-await gas.dispatchEvent('pointerdown', { pointerId: 71, pointerType: 'touch', clientX: gx, clientY: gy });
+const cdp = await mobile.newCDPSession(mobilePage);
+const touchPoint = (x, y, id = 0) => ({ x, y, id, radiusX: 1, radiusY: 1, force: 1 });
+await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [touchPoint(gx, gy, 71)] });
+await mobilePage.waitForTimeout(60);
 if (!(await gas.evaluate((el) => el.classList.contains('active')))) {
-  throw new Error('mobile gas pointerdown did not engage the control');
+  throw new Error('mobile gas touchstart did not engage the control');
 }
-await gas.dispatchEvent('pointerup', { pointerId: 71, pointerType: 'touch', clientX: gx, clientY: gy });
+await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+await mobilePage.waitForTimeout(60);
 if (await gas.evaluate((el) => el.classList.contains('active'))) {
-  throw new Error('mobile gas pointerup did not release the control');
+  throw new Error('mobile gas touchend did not release the control');
 }
 
 const wheel = mobilePage.locator('#wheel');
@@ -195,26 +199,19 @@ const wheelBox = await wheel.boundingBox();
 if (!wheelBox) throw new Error('mobile steering wheel has no layout box');
 const cx = wheelBox.x + wheelBox.width / 2;
 const cy = wheelBox.y + wheelBox.height / 2;
-await wheel.dispatchEvent('pointerdown', {
-  pointerId: 72,
-  pointerType: 'touch',
-  clientX: wheelBox.x + wheelBox.width * 0.90,
-  clientY: cy,
+const wheelStartX = wheelBox.x + wheelBox.width * 0.90;
+const wheelEndY = wheelBox.y + wheelBox.height * 0.90;
+await cdp.send('Input.dispatchTouchEvent', {
+  type: 'touchStart',
+  touchPoints: [touchPoint(wheelStartX, cy, 72)],
 });
-await wheel.dispatchEvent('pointermove', {
-  pointerId: 72,
-  pointerType: 'touch',
-  clientX: cx,
-  clientY: wheelBox.y + wheelBox.height * 0.90,
+await cdp.send('Input.dispatchTouchEvent', {
+  type: 'touchMove',
+  touchPoints: [touchPoint(cx, wheelEndY, 72)],
 });
 await mobilePage.waitForTimeout(80);
 const steerValue = Number(await wheel.getAttribute('aria-valuenow'));
-await wheel.dispatchEvent('pointerup', {
-  pointerId: 72,
-  pointerType: 'touch',
-  clientX: cx,
-  clientY: wheelBox.y + wheelBox.height * 0.90,
-});
+await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 if (!Number.isFinite(steerValue) || Math.abs(steerValue) < 10) {
   throw new Error('mobile steering drag did not produce an analog steering command');
 }
@@ -232,7 +229,7 @@ console.log(JSON.stringify({
   mobile: {
     canvas: mobileCanvas,
     steeringAriaPercentAfterDrag: steerValue,
-    gasPointerLifecycle: 'passed',
+    gasTouchLifecycle: 'passed',
   },
   errors: [],
   status: 'passed',
