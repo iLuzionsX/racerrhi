@@ -1,7 +1,7 @@
 name: Publish APEX to GitHub Pages
 on:
   push:
-    branches: [main, astra/physics-pipeline-repair, astra/progressive-tyre-recovery]
+    branches: [main, astra/physics-pipeline-repair, astra/progressive-tyre-recovery, astra/slide-recovery-unwind]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -114,7 +114,7 @@ jobs:
             printf '{"commit":"%s","ref":"refs/heads/main","donor":"%s"}\n' "$MAIN_SHA" 'abff9f452e4c2b22ac1220a1414418ace3f36e0a' > production-main/dist/build-info.json
             cp -a production-main/dist/. site/
             case "${GITHUB_REF_NAME}" in
-              astra/progressive-tyre-recovery) PREVIEW_SLUG="pr-17" ;;
+              astra/progressive-tyre-recovery) PREVIEW_SLUG="pr-17" ;;\n              astra/slide-recovery-unwind) PREVIEW_SLUG="slide-recovery-unwind" ;;
               astra/physics-pipeline-repair) PREVIEW_SLUG="pr-16" ;;
               *) PREVIEW_SLUG="branch-preview" ;;
             esac
