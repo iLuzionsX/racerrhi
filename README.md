@@ -18,7 +18,7 @@ Serve `dist` over HTTP: `python3 -m http.server 8080 --directory dist`. Open htt
 
 ## GitHub Pages
 
-Upload this repository to a new GitHub repository with default branch `main`. In Settings → Pages choose **GitHub Actions** as source. The included workflow verifies driving logic and publishes `dist`. All rendering code, model, decoder, and fonts are local, using relative URLs compatible with repository Pages subpaths. No npm install or bundler is needed.
+Upload this repository to a new GitHub repository with default branch `main`. In Settings → Pages choose **GitHub Actions** as source. The included workflow verifies driving logic and publishes `dist`. All rendering code, model, decoder, and fonts are local, using relative URLs compatible with repository Pages subpaths. The workflow fetches the pinned donor, applies the checked-in suspension timing patch, and bundles the M5 runtime before publishing.
 
 ## Verification
 
@@ -35,3 +35,26 @@ Upload this repository to a new GitHub repository with default branch `main`. In
 - Original circuit, scene geometry, procedural materials, UI, synthesized audio, and driving code: created for this project.
 
 The reusable build brief is in `dist/PROMPT.md`.
+
+## M5 uphill corner load correction
+
+The donor remains pinned to `abff9f452e4c2b22ac1220a1414418ace3f36e0a`.
+After checking it out at `.vendor/Racing26`, run `node integration/apply-donor-patches.mjs`
+before building or running physics tests. The script verifies the pin and applies
+`integration/patches/racing26-road-load-time.patch` idempotently.
+
+The suspension previously evaluated its advanced wheel hub against the previous
+road elevation. On a steady climb this discarded `tire stiffness × vertical road
+speed × timestep` of load per tire; descents gained the same fictitious load.
+The patch advances the sampled road plane alongside the hub for the end-of-step
+compression evaluation. Tire coefficients, steering, suspension calibration and
+crash stabilization are unchanged.
+
+`node --import tsx integration/m5-uphill-corner-regression.test.ts` checks uphill and
+downhill load invariance and drives the actual first uphill corner from rest with
+a 119 km/h speed target. It extracts the shipped track sampling code, uses the
+production input bridge, and covers four analog steering trajectories. Before:
+about 89 degrees peak sideslip, with the slide beginning on asphalt before any
+barrier contact. After: 1.93–2.86 degrees, no barrier contact or crash-stabilizer
+intervention. The flattened-track control is unchanged at 2.14 degrees.
+This is a deterministic driver regression, not physical iPhone testing.

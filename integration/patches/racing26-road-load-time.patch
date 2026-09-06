@@ -1,0 +1,20 @@
+diff --git a/src/physics/Suspension.ts b/src/physics/Suspension.ts
+index b33bd7b..0ba6abc 100644
+--- a/src/physics/Suspension.ts
++++ b/src/physics/Suspension.ts
+@@ -568,9 +568,14 @@ export class SuspensionSystem {
+         cfg.bumpStopProgression ?? 4.0,
+         cfg.bumpStopExponent ?? 2.2
+       );
++      // The hub is now at t + dt. Advance the sampled road plane to the same
++      // time along the wheel's planar motion before evaluating compression.
++      // Using elevation(t) here removes K * roadVelocityY * dt of tire load
++      // uphill (and invents it downhill), even on a steady, smooth grade.
++      const roadElevationAtEnd = surface.elevation + roadVelocitiesY[i] * dt;
+       const tireCompression = Math.max(
+         0,
+-        surface.elevation + wheelRadius - hubPositionWorldY
++        roadElevationAtEnd + wheelRadius - hubPositionWorldY
+       );
+       const tireNormalForce = Math.max(
+         0,
