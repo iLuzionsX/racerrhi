@@ -2,6 +2,8 @@ import { DEFAULT_VEHICLE_CONFIG } from '../.vendor/Racing26/src/physics/vehicleP
 import { BMW_M5_2025_OVERRIDES } from '../.vendor/Racing26/src/physics/m5G90';
 
 export const RACERRHI_STANDARD_GRAVITY_MS2 = 9.81;
+export const RACING26_M5_LATERAL_RELAXATION_LENGTH_M = 0.50;
+export const RACERRHI_M5_LATERAL_RELAXATION_LENGTH_M = 0.35;
 
 /**
  * Racing26 can infer tire reference load from the first 240 loaded tire samples
@@ -25,6 +27,15 @@ export function createRacerrhiM5Config(): any {
 
   config.tireReferenceLoadFrontN = totalStaticWeightN * frontShare * 0.5;
   config.tireReferenceLoadRearN = totalStaticWeightN * (1 - frontShare) * 0.5;
+
+  // The pinned Racing26 M5 uses a 0.50 m lateral relaxation length. Racerrhi's
+  // measured steering-reversal trace shows that the donor then applies a second
+  // force-relaxation stage derived from the same length, retaining stale lateral
+  // force after the geometric slip has already reversed. A 0.35 m integration
+  // calibration halves that extra force-reversal delay while leaving peak yaw and
+  // sustained lateral force effectively unchanged. WheelDynamics already uses an
+  // exponential travel-domain update, so this remains fixed-step/timestep safe.
+  config.relaxationLength = RACERRHI_M5_LATERAL_RELAXATION_LENGTH_M;
 
   return config;
 }
