@@ -119,7 +119,145 @@ assert(Math.abs(leftTurn.peakYaw-rightTurn.peakYaw) / Math.max(.01,leftTurn.peak
   'left/right yaw response lost symmetry');
 
 // -----------------------------------------------------------------------------
-// 3) Boundary response preserves simulation history and cannot inject speed energy.
+// 3) Sustained corner -> lift -> brake -> throttle exit remains progressive.
+// -----------------------------------------------------------------------------
+type PhaseMetric = {
+  name:string;
+  peakYawRadS:number;
+  peakSlipRad:number;
+  peakGripUtilization:number;
+  maxWheelForceStepN:number;
+  minNormalLoadN:number;
+  endSlipRad:number;
+  endYawRadS:number;
+};
+
+let drivePhases:PhaseMetric[]=[];
+{
+  const state:any=newCar(0,0,0);
+  setCarPose(state,0,0,0,60/3.6);
+  for(let i=0;i<30;i++) stepCar(state,{analogSteerTarget:0,analogSteerActive:true,throttle:.2},M5_FIXED_DT);
+
+  let previousForces=state.wheels.map((w:any)=>Math.hypot(w.forceLongitudinalN,w.forceLateralN));
+  const runPhase=(name:string,steps:number,input:any)=>{
+    const metric:PhaseMetric={
+      name,peakYawRadS:0,peakSlipRad:0,peakGripUtilization:0,maxWheelForceStepN:0,
+      minNormalLoadN:Number.POSITIVE_INFINITY,endSlipRad:0,endYawRadS:0,
+    };
+    for(let i=0;i<steps;i++){
+      stepCar(state,input,M5_FIXED_DT);
+      assert(finiteState(state),name+' produced non-finite state');
+      metric.peakYawRadS=Math.max(metric.peakYawRadS,Math.abs(state.yawRate));
+      metric.peakSlipRad=Math.max(metric.peakSlipRad,Math.abs(state.slip));
+      for(let w=0;w<state.wheels.length;w++){
+        const wheel=state.wheels[w];
+        metric.peakGripUtilization=Math.max(metric.peakGripUtilization,wheel.gripUtilization);
+        metric.minNormalLoadN=Math.min(metric.minNormalLoadN,wheel.normalLoadN);
+        const force=Math.hypot(wheel.forceLongitudinalN,wheel.forceLateralN);
+        metric.maxWheelForceStepN=Math.max(metric.maxWheelForceStepN,Math.abs(force-previousForces[w]));
+        previousForces[w]=force;
+      }
+    }
+    metric.endSlipRad=state.slip;
+    metric.endYawRadS=state.yawRate;
+    drivePhases.push(metric);
+    return metric;
+  };
+
+  const sustained=runPhase('sustained-corner',180,{analogSteerTarget:-.35,analogSteerActive:true,throttle:.28});
+  const lift=runPhase('lift-off',60,{analogSteerTarget:-.35,analogSteerActive:true,throttle:0});
+  const braking=runPhase('braking-in-corner',60,{analogSteerTarget:-.35,analogSteerActive:true,throttle:0,brake:.30});
+  const exit=runPhase('throttle-exit-and-unwind',120,{analogSteerTarget:0,analogSteerActive:true,throttle:.38,brake:0});
+
+  assert(sustained.peakYawRadS>.05,'sustained corner did not build measurable yaw response');
+  for(const phase of [sustained,lift,braking,exit]){
+    assert(phase.peakYawRadS<1.5,phase.name+' yaw response became unrecoverable');
+    assert(phase.peakSlipRad<.45,phase.name+' sideslip became unrecoverable');
+    assert(phase.minNormalLoadN>100,phase.name+' lost a tire contact under moderate loading');
+    assert(phase.maxWheelForceStepN<12000,phase.name+' produced a discontinuous wheel-force step');
+  }
+  assert(Math.abs(exit.endSlipRad)<.10,'car did not settle sideslip after steering unwind and throttle exit');
+}
+
+// -----------------------------------------------------------------------------
+// 4) A modest slide is catchable through donor digital countersteer.
+// -----------------------------------------------------------------------------
+let slideReport:any;
+{
+  const state:any=newCar(0,0,0);
+  setCarPose(state,0,0,0,80/3.6);
+  const sim:any=state._m5;
+  const forward=80/3.6;
+  sim.vehicle.rigidBody.velocity=PhysicsMath.vec3(-Math.tan(8*Math.PI/180)*forward,0,forward);
+  sim.vehicle.rigidBody.angularVelocity=PhysicsMath.vec3(0,.45,0);
+  refreshCarState(state);
+
+  const initialSlip=Math.abs(state.slip);
+  const initialYaw=Math.abs(state.yawRate);
+  const initialError=initialSlip+initialYaw*.35;
+  let bestError=initialError;
+  let peakSlip=initialSlip;
+  let peakYaw=initialYaw;
+  for(let i=0;i<120;i++){
+    stepCar(state,{digitalSteerDirection:-1,throttle:.12},M5_FIXED_DT);
+    const error=Math.abs(state.slip)+Math.abs(state.yawRate)*.35;
+    bestError=Math.min(bestError,error);
+    peakSlip=Math.max(peakSlip,Math.abs(state.slip));
+    peakYaw=Math.max(peakYaw,Math.abs(state.yawRate));
+    assert(finiteState(state),'countersteer recovery produced non-finite state');
+  }
+  for(let i=0;i<60;i++) stepCar(state,{digitalSteerDirection:0,throttle:.15},M5_FIXED_DT);
+
+  assert(bestError<initialError*.80,'modest slide did not respond to opposite-lock recovery');
+  assert(peakSlip<.45,'modest slide snapped into excessive sideslip during recovery');
+  assert(peakYaw<1.5,'modest slide snapped into excessive yaw rate during recovery');
+  assert(Math.abs(state.slip)<initialSlip,'sideslip did not settle after catch and steering release');
+
+  slideReport={
+    initialSlipDeg:initialSlip*180/Math.PI,
+    initialYawDegS:initialYaw*180/Math.PI,
+    bestErrorRatio:bestError/initialError,
+    finalSlipDeg:Math.abs(state.slip)*180/Math.PI,
+    finalYawDegS:Math.abs(state.yawRate)*180/Math.PI,
+  };
+}
+
+// -----------------------------------------------------------------------------
+// 5) Stop, reverse signed motion, deliberate restart, and pause/resume semantics.
+// -----------------------------------------------------------------------------
+let stopReverseReport:any;
+{
+  const state:any=newCar(0,0,0);
+  setCarPose(state,0,0,0,10);
+  const sim:any=state._m5;
+  for(let i=0;i<360;i++) stepCar(state,{digitalSteerDirection:0,brake:1},M5_FIXED_DT);
+  const stoppedSpeed=state.speed;
+  assert(stoppedSpeed<4,'sustained braking did not bring the M5 to a bounded near-stop');
+
+  for(let i=0;i<15;i++) stepCar(state,{digitalSteerDirection:1,throttle:.1},M5_FIXED_DT);
+  assert(sim.stepCount>0);
+  setCarPose(state,1,2,0,-4);
+  assert.equal(sim.stepCount,0,'deliberate restart did not reset donor simulation history');
+  assert(state.localVelocityMs.forward<0,'reverse spawn lost signed forward velocity');
+  assert.equal(state.slip,0,'straight reverse motion should not manufacture sideslip');
+
+  const clock=createM5StepScheduler();
+  let pauseSteps=0;
+  consumeM5FrameTime(clock,M5_FIXED_DT*.5,()=>pauseSteps++);
+  pauseM5StepScheduler(clock);
+  consumeM5FrameTime(clock,M5_FIXED_DT,()=>pauseSteps++);
+  assert.equal(pauseSteps,1,'pause/resume carried stale fractional simulation time');
+
+  stopReverseReport={
+    stoppedSpeedMs:stoppedSpeed,
+    reverseForwardVelocityMs:state.localVelocityMs.forward,
+    restartStepCount:sim.stepCount,
+    resumedSteps:pauseSteps,
+  };
+}
+
+// -----------------------------------------------------------------------------
+// 6) Boundary response preserves simulation history and cannot inject speed energy.
 // -----------------------------------------------------------------------------
 let boundaryReport:any;
 {
@@ -209,7 +347,7 @@ let boundaryReport:any;
 }
 
 // -----------------------------------------------------------------------------
-// 4) Snapshot interpolation: angle wrap, physical height and wheel identity.
+// 7) Snapshot interpolation: angle wrap, physical height and wheel identity.
 // -----------------------------------------------------------------------------
 {
   const d = Math.PI/180;
@@ -240,7 +378,7 @@ let boundaryReport:any;
 }
 
 // -----------------------------------------------------------------------------
-// 5) One timing owner: deterministic 30/60/120 Hz render cadence + stall reporting.
+// 8) One timing owner: deterministic 30/60/120 Hz render cadence + stall reporting.
 // -----------------------------------------------------------------------------
 function runCadence(fps:number) {
   const state:any = newCar(0,0,0);
@@ -317,6 +455,17 @@ console.log(JSON.stringify({
     leftPeakSideslipDeg:leftTurn.peakSlip*180/Math.PI,
     rightPeakSideslipDeg:rightTurn.peakSlip*180/Math.PI,
   },
+  drivePhases:drivePhases.map(phase=>({
+    name:phase.name,
+    peakYawDegS:phase.peakYawRadS*180/Math.PI,
+    peakSideslipDeg:phase.peakSlipRad*180/Math.PI,
+    peakGripUtilization:phase.peakGripUtilization,
+    maxWheelForceStepN:phase.maxWheelForceStepN,
+    minNormalLoadN:phase.minNormalLoadN,
+    endSideslipDeg:phase.endSlipRad*180/Math.PI,
+  })),
+  slideRecovery:slideReport,
+  stopReverseRestart:stopReverseReport,
   boundary:boundaryReport,
   cadence:{
     steps30Hz:c30.clock.stepCount,
