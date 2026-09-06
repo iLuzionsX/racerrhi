@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { PhysicsMath } from '../.vendor/Racing26/src/physics/math/PhysicsMath';
 import { Simulation } from '../.vendor/Racing26/src/physics/Simulation';
 import { DEFAULT_VEHICLE_CONFIG } from '../.vendor/Racing26/src/physics/vehiclePresets';
-import { BMW_M5_2025_OVERRIDES } from '../.vendor/Racing26/src/physics/m5G90';
 import { racerrhiSurfaceMaterialForDistance } from './m5-surface-adapter';
+import { createRacerrhiM5Config } from './m5-config';
 
 const points = [
   [-225,13,-200],[-225,13,50],[-185,16,245],[-55,22,325],[100,27,265],[155,24,115],
@@ -158,7 +158,7 @@ console.log(JSON.stringify({
 },null,2));
 
 
-const m5Cfg:any={...DEFAULT_VEHICLE_CONFIG,...BMW_M5_2025_OVERRIDES};
+const m5Cfg:any=createRacerrhiM5Config();
 const neutral={throttle:0,brake:0,steer:0,handbrake:false,shiftUp:false,shiftDown:false};
 
 function legacyMaterial(distance:number){
