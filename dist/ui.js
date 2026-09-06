@@ -1,4 +1,4 @@
-import {defaults,sanitize,bounds,clamp,angleDelta,thumbSteer} from './controls.mjs?v=2';
+import {defaults,sanitize,bounds,clamp,angleDelta,thumbSteer} from './controls.mjs?v=3';
 const $=id=>document.getElementById(id);
 export const config=sanitize((()=>{try{return JSON.parse(localStorage.getItem('apex-controls-v2'));}catch{return {};}})());
 export const input={steer:0,throttle:0,brake:0,held:false};
@@ -30,7 +30,7 @@ wheel.onpointermove=e=>{
   }
   lastX=e.clientX;
 };
-const release=e=>{if(e.pointerId===pointer){pointer=null;lastAngle=null;input.held=false;}};
+const release=e=>{if(e.pointerId===pointer){pointer=null;lastAngle=null;input.held=false;input.steer=0;}};
 wheel.onpointerup=wheel.onpointercancel=wheel.onlostpointercapture=release;
 wheel.onkeydown=e=>{if(['ArrowLeft','ArrowRight','Home'].includes(e.key)){e.preventDefault();e.stopPropagation();input.steer=e.key==='Home'?0:clamp(input.steer+(e.key==='ArrowRight'?.08:-.08),-1,1);}};
 for(const [id,key] of [['gas','throttle'],['brake','brake']]){const el=$(id);el.onpointerdown=e=>{if(editing)return;e.preventDefault();el.dataset.pointer=String(e.pointerId);el.setPointerCapture(e.pointerId);input[key]=1;el.classList.add('active');};const up=e=>{if(el.dataset.pointer!==String(e.pointerId))return;input[key]=0;delete el.dataset.pointer;el.classList.remove('active');};el.onpointerup=el.onpointercancel=el.onlostpointercapture=up;}
