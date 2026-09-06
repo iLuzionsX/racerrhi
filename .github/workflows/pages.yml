@@ -45,6 +45,10 @@ jobs:
         run: npx --yes tsx@4.20.6 integration/m5-first-turn-regression.test.ts
       - name: Validate Racerrhi surface continuity
         run: npx --yes tsx@4.20.6 integration/m5-surface-continuity-regression.test.ts
+      - name: Validate mixed steering handoff and staged wheel pose
+        run: npx --yes tsx@4.20.6 integration/m5-steering-handoff-regression.test.ts
+      - name: Compare driver slide-recovery inputs
+        run: npx --yes tsx@4.20.6 integration/m5-driver-recovery-regression.test.ts
       - name: Validate game
         run: |
           if [ -f dist/m5-runtime.js ]; then node --check dist/m5-runtime.js; fi

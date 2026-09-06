@@ -10,6 +10,7 @@ export {
   refreshCarState,
   captureM5RenderSnapshot,
   interpolateM5RenderSnapshots,
+  rebaseM5RenderSnapshotPose,
   createM5StepScheduler,
   resetM5StepScheduler,
   pauseM5StepScheduler,
