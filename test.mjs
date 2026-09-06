@@ -31,7 +31,9 @@ l=lap();advanceLap(l,.95,true,1);assert.equal(advanceLap(l,.01,true,1),null);con
 l=lap();for(const t of [.05,.26,.51,.76,.95])advanceLap(l,t,t!==.51,10);assert.equal(advanceLap(l,.01,true,1),null);console.log('PASS off-track lap rejected');
 
 const gameSource=fs.readFileSync(new URL('./dist/game.js',import.meta.url),'utf8');
+const physicsSource=fs.readFileSync(new URL('./dist/physics.mjs',import.meta.url),'utf8');
 assert(gameSource.includes('car.add(steerPivot)'));assert(!gameSource.includes('body.add(steerPivot)'));assert(gameSource.includes('const chassisCgLocalY=.52-.035'));console.log('PASS wheel assemblies are decoupled from chassis roll/pitch');
+assert(physicsSource.includes("./m5-runtime.js?v=3"));console.log('PASS corrected M5 runtime cache bust is active');
 const chassisCgDeclaration=gameSource.indexOf('const chassisCgLocalY=.52-.035'),m5VisualLoad=gameSource.indexOf('try{\n const visual=await loadM5Visual()');assert(chassisCgDeclaration>=0&&m5VisualLoad>=0&&chassisCgDeclaration<m5VisualLoad);console.log('PASS chassis CG render constant remains in animation-loop scope');
 
 const indexSource=fs.readFileSync(new URL('./dist/index.html',import.meta.url),'utf8');
