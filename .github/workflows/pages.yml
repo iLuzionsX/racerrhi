@@ -49,6 +49,8 @@ jobs:
         run: npx --yes tsx@4.20.6 integration/m5-steering-handoff-regression.test.ts
       - name: Compare driver slide-recovery inputs
         run: npx --yes tsx@4.20.6 integration/m5-driver-recovery-regression.test.ts
+      - name: Diagnose slide recovery and steering unwind matrix
+        run: npx --yes tsx@4.20.6 integration/m5-slide-unwind-regression.test.ts
       - name: Validate game
         run: |
           if [ -f dist/m5-runtime.js ]; then node --check dist/m5-runtime.js; fi
