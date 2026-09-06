@@ -32,6 +32,7 @@ l=lap();for(const t of [.05,.26,.51,.76,.95])advanceLap(l,t,t!==.51,10);assert.e
 
 const gameSource=fs.readFileSync(new URL('./dist/game.js',import.meta.url),'utf8');
 assert(gameSource.includes('car.add(steerPivot)'));assert(!gameSource.includes('body.add(steerPivot)'));assert(gameSource.includes('const chassisCgLocalY=.52-.035'));console.log('PASS wheel assemblies are decoupled from chassis roll/pitch');
+const chassisCgDeclaration=gameSource.indexOf('const chassisCgLocalY=.52-.035'),m5VisualLoad=gameSource.indexOf('try{\n const visual=await loadM5Visual()');assert(chassisCgDeclaration>=0&&m5VisualLoad>=0&&chassisCgDeclaration<m5VisualLoad);console.log('PASS chassis CG render constant remains in animation-loop scope');
 
 const indexSource=fs.readFileSync(new URL('./dist/index.html',import.meta.url),'utf8');
 const uiSource=fs.readFileSync(new URL('./dist/ui.js',import.meta.url),'utf8');
