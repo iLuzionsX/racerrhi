@@ -122,6 +122,17 @@ function simulate(dt){
   };
   lastRoad=nearest(state.x,state.z);
   stepCar(state,input,dt,lastRoad);
+  if(globalThis.__racerrhiDiagnostics){
+   const sim=state._m5;
+   globalThis.__racerrhiDiagnostics.lastPhysicsInput={
+    ...input,
+    donorDigitalSteeringInput:sim?.digitalSteeringInput??0,
+    donorAnalogSteeringInput:sim?.analogSteeringInput??0,
+    roadWheelAngleRad:state.steer,
+    stepCount:sim?.stepCount??0,
+    timestampMs:performance.now()
+   };
+  }
   lastRoad=nearest(state.x,state.z);
   if(lastRoad.distance>14.5){
    const side=lastRoad.side>=0?1:-1;
