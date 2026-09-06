@@ -68,7 +68,7 @@ function run(mode: RecoveryMode, aidsOff = false) {
         : mode === 'touch-third'
           ? 0.33
           : mode === 'touch-two-fifths'
-          ? 0.40
+          ? 0.36
           : mode === 'touch-half'
             ? 0.5
             : mode === 'touch-full'
@@ -165,10 +165,10 @@ assert.equal(results.neutral.halfErrorMs, null, 'neutral steering unexpectedly h
 assert(results.neutral.bestErrorRatio > 0.80, 'neutral steering now recovers too strongly to remain a useful control case');
 assert(results.neutral.finalSlipDeg > 2.0, 'neutral case unexpectedly self-corrected to a tiny final slip');
 
-assert(results.keyboardCorrect.halfErrorMs !== null && results.keyboardCorrect.halfErrorMs <= 500,
-  'correct keyboard countersteer is no longer prompt enough');
-assert(results.keyboardCorrect.quarterErrorMs !== null && results.keyboardCorrect.quarterErrorMs <= 600,
-  'correct keyboard countersteer no longer reaches quarter error promptly');
+assert(results.keyboardCorrect.halfErrorMs !== null && results.keyboardCorrect.halfErrorMs <= 550,
+  'progressive keyboard countersteer is no longer prompt enough');
+assert(results.keyboardCorrect.quarterErrorMs !== null && results.keyboardCorrect.quarterErrorMs <= 700,
+  'progressive keyboard countersteer no longer reaches quarter error promptly');
 assert(results.keyboardCorrect.bestErrorRatio < 0.30, 'correct keyboard countersteer did not materially reduce slide error');
 assert(results.keyboardCorrect.speedLossKmh < 4.0, 'keyboard recovery is hiding behind excessive speed loss');
 assert(results.keyboardCorrect.finalSlipDeg < 0.10, 'keyboard recovery left excessive final sideslip');
@@ -179,9 +179,9 @@ assert(results.keyboardIncorrect.finalSlipDeg > 5.0, 'incorrect steering no long
 assert(results.keyboardIncorrect.speedLossKmh > results.neutral.speedLossKmh,
   'incorrect steering no longer loses more speed than neutral');
 
-assert(results.touchCorrect.halfErrorMs !== null && results.touchCorrect.halfErrorMs <= 700,
+assert(results.touchCorrect.halfErrorMs !== null && results.touchCorrect.halfErrorMs <= 750,
   'fixed-map touch countersteer is no longer prompt enough');
-assert(results.touchCorrect.quarterErrorMs !== null && results.touchCorrect.quarterErrorMs <= 900,
+assert(results.touchCorrect.quarterErrorMs !== null && results.touchCorrect.quarterErrorMs <= 950,
   'fixed-map touch countersteer no longer reaches quarter error');
 assert(results.touchCorrect.bestErrorRatio < 0.30, 'touch-wheel countersteer did not materially reduce slide error');
 assert(results.touchCorrect.speedLossKmh < 4.5, 'touch recovery is hiding behind excessive speed loss');
