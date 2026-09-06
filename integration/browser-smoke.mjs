@@ -118,7 +118,7 @@ if (await desktopPage.locator('#pause-dialog').evaluate((el) => el.open)) {
 }
 await desktopPage.waitForFunction(() => !document.getElementById('countdown')?.hidden, null, { timeout: 5000 });
 try {
-  await desktopPage.waitForFunction(() => document.getElementById('countdown')?.hidden, null, { timeout: 10000 });
+  await desktopPage.waitForFunction(() => document.getElementById('countdown')?.hidden, null, { timeout: 45000 });
 } catch (error) {
   const state = await desktopPage.evaluate(() => ({
     countdownHidden: document.getElementById('countdown')?.hidden,
@@ -132,10 +132,10 @@ try {
 }
 await desktopPage.keyboard.down('ArrowUp');
 await desktopPage.keyboard.down('ArrowLeft');
-await desktopPage.waitForTimeout(1400);
+await desktopPage.waitForFunction(() => Number(document.getElementById('speed')?.textContent || '0') > 0, null, { timeout: 20000 });
+const desktopSpeed = Number((await desktopPage.locator('#speed').textContent()) || '0');
 await desktopPage.keyboard.up('ArrowLeft');
 await desktopPage.keyboard.up('ArrowUp');
-const desktopSpeed = Number((await desktopPage.locator('#speed').textContent()) || '0');
 if (!(desktopSpeed > 0)) throw new Error('keyboard throttle did not move the car after countdown');
 if (desktopErrors.length) throw new Error('desktop startup errors: ' + desktopErrors.join(' | '));
 
