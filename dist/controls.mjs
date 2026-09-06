@@ -8,6 +8,8 @@ export function steerFromAngle(angle,sensitivity=1){return clamp(angle/(Math.PI*
 // Relative thumb travel: any grab point is valid and vertical motion is ignored.
 // Clamp each movement, not the cumulative drag origin, so reversing after full
 // lock responds immediately even if the finger travelled outside the control.
+// 45% of the displayed wheel width reaches raw full lock at 100% sensitivity,
+// so a center grab can still reach either direction when the wheel sits at an edge.
 export function thumbSteer(current,deltaX,width,sensitivity=1){
-  return clamp(current+deltaX/Math.max(1,width*.55)*sensitivity,-1,1);
+  return clamp(current+deltaX/Math.max(1,width*.45)*sensitivity,-1,1);
 }
