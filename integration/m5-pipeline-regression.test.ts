@@ -332,8 +332,20 @@ let boundaryReport:any;
   assert(repeatedAfter <= repeatedBefore + 1e-9, 'repeated boundary correction injected energy');
 
   for(let i=0;i<120;i++) stepCar(state,{digitalSteerDirection:0,throttle:.2},M5_FIXED_DT);
-  assert.equal(sim.stepCount, stepCountBefore + 120, 'normal driving after contact did not continue the same simulation history');
-  assert(finiteState(state), 'post-boundary driving produced non-finite state');
+  const postImpactStraightStepCount = sim.stepCount;
+  let postImpactCornerPeakYaw = 0;
+  let postImpactCornerPeakSlip = 0;
+  for(let i=0;i<120;i++) {
+    stepCar(state,{digitalSteerDirection:1,throttle:.18},M5_FIXED_DT);
+    postImpactCornerPeakYaw = Math.max(postImpactCornerPeakYaw, Math.abs(state.yawRate));
+    postImpactCornerPeakSlip = Math.max(postImpactCornerPeakSlip, Math.abs(state.slip));
+  }
+  assert.equal(postImpactStraightStepCount, stepCountBefore + 120, 'normal driving after contact did not continue the same simulation history');
+  assert.equal(sim.stepCount, stepCountBefore + 240, 'post-impact cornering did not continue the same simulation history');
+  assert(postImpactCornerPeakYaw > .04, 'post-impact steering no longer built normal cornering yaw');
+  assert(postImpactCornerPeakYaw < 1.5, 'post-impact cornering became unstable');
+  assert(postImpactCornerPeakSlip < .45, 'post-impact cornering retained excessive sideslip');
+  assert(finiteState(state), 'post-boundary cornering produced non-finite state');
 
   boundaryReport = {
     legacyBoundaryWouldResetStepCountTo: 0,
@@ -343,6 +355,8 @@ let boundaryReport:any;
     speedMsAfterContact: Math.sqrt(speedSqAfter),
     outwardSpeedBeforeMs: firstContactTelemetry.outwardSpeedBeforeMs,
     outwardSpeedAfterMs: firstContactTelemetry.outwardSpeedAfterMs,
+    postImpactCornerPeakYawDegS: postImpactCornerPeakYaw * 180 / Math.PI,
+    postImpactCornerPeakSlipDeg: postImpactCornerPeakSlip * 180 / Math.PI,
   };
 }
 
