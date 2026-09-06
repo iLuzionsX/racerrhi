@@ -40,7 +40,7 @@ const brakeCases = [
 
 function wheelPatchTelemetry(sim: any, state: any, brakeInput: number) {
   const hardpoints = sim.vehicle.getHardpointsBody();
-  const torques = sim.brakes.calculateBrakeTorques(brakeInput, false).hydraulicTorques;
+  const torques = sim.vehicle.brakes.calculateBrakeTorques(brakeInput, false).hydraulicTorques;
 
   return state.wheels.map((telemetry: any, i: number) => {
     const wheel = sim.vehicle.wheels[i];
