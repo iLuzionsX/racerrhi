@@ -174,6 +174,7 @@ function highSpeedTurnProbe(direction:-1|1) {
   const state:any = newCar(0,0,0);
   setCarPose(state,0,0,0,160/3.6);
   let peakRollRad = 0;
+  let peakPitchRad = 0;
   let peakYawRadS = 0;
   let peakSlipRad = 0;
   let maxLocalLateralDeviationM = 0;
@@ -186,6 +187,7 @@ function highSpeedTurnProbe(direction:-1|1) {
   for(let i=0;i<240;i++) {
     stepCar(state,{analogSteerTarget:direction*.16,analogSteerActive:true,throttle:.28},M5_FIXED_DT);
     peakRollRad = Math.max(peakRollRad,Math.abs(state.physicalPose.rollRad));
+    peakPitchRad = Math.max(peakPitchRad,Math.abs(state.physicalPose.pitchRad));
     peakYawRadS = Math.max(peakYawRadS,Math.abs(state.yawRate));
     peakSlipRad = Math.max(peakSlipRad,Math.abs(state.slip));
 
@@ -203,6 +205,7 @@ function highSpeedTurnProbe(direction:-1|1) {
 
   return {
     peakRollRad,
+    peakPitchRad,
     peakYawRadS,
     peakSlipRad,
     maxLocalLateralDeviationM,
@@ -573,6 +576,8 @@ console.log(JSON.stringify({
   highSpeedTurnProbe:{
     left:{
       peakRollDeg:highSpeedLeft.peakRollRad*180/Math.PI,
+      peakPitchDeg:highSpeedLeft.peakPitchRad*180/Math.PI,
+      supportBodyYByCornerM:(leftTurn.state as any)._m5.vehicle.planarSupportBodyYByCorner,
       peakYawDegS:highSpeedLeft.peakYawRadS*180/Math.PI,
       peakSideslipDeg:highSpeedLeft.peakSlipRad*180/Math.PI,
       maxLocalLateralDeviationMm:highSpeedLeft.maxLocalLateralDeviationM*1000,
@@ -581,6 +586,8 @@ console.log(JSON.stringify({
     },
     right:{
       peakRollDeg:highSpeedRight.peakRollRad*180/Math.PI,
+      peakPitchDeg:highSpeedRight.peakPitchRad*180/Math.PI,
+      supportBodyYByCornerM:(rightTurn.state as any)._m5.vehicle.planarSupportBodyYByCorner,
       peakYawDegS:highSpeedRight.peakYawRadS*180/Math.PI,
       peakSideslipDeg:highSpeedRight.peakSlipRad*180/Math.PI,
       maxLocalLateralDeviationMm:highSpeedRight.maxLocalLateralDeviationM*1000,
