@@ -1,7 +1,7 @@
 name: Publish APEX to GitHub Pages
 on:
   push:
-    branches: [main, astra/physics-pipeline-repair, astra/progressive-tyre-recovery]
+    branches: [main, astra/physics-pipeline-repair, astra/progressive-tyre-recovery, astra/slide-recovery-unwind]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -26,6 +26,7 @@ jobs:
           git -C .vendor/Racing26 remote add origin https://github.com/iLuzionsX/Racing26.git
           git -C .vendor/Racing26 fetch --depth 1 origin abff9f452e4c2b22ac1220a1414418ace3f36e0a
           git -C .vendor/Racing26 checkout --detach FETCH_HEAD
+          node integration/apply-donor-patches.mjs
       - name: Build Racing26 M5 runtime
         if: ${{ hashFiles('integration/m5-bridge.ts') != '' }}
         run: |
@@ -41,6 +42,8 @@ jobs:
         run: npx --yes tsx@4.20.6 integration/m5-reference-load-regression.test.ts
       - name: Validate Racerrhi M5 disturbance recovery
         run: npx --yes tsx@4.20.6 integration/m5-racerrhi-recovery.test.ts
+      - name: Validate uphill tire load timing and 119 km/h first corner
+        run: npx --yes tsx@4.20.6 integration/m5-uphill-corner-regression.test.ts
       - name: Validate Racerrhi first-turn steering
         run: npx --yes tsx@4.20.6 integration/m5-first-turn-regression.test.ts
       - name: Validate Racerrhi surface continuity
@@ -49,6 +52,8 @@ jobs:
         run: npx --yes tsx@4.20.6 integration/m5-steering-handoff-regression.test.ts
       - name: Compare driver slide-recovery inputs
         run: npx --yes tsx@4.20.6 integration/m5-driver-recovery-regression.test.ts
+      - name: Diagnose slide recovery and steering unwind matrix
+        run: npx --yes tsx@4.20.6 integration/m5-slide-unwind-regression.test.ts
       - name: Validate game
         run: |
           if [ -f dist/m5-runtime.js ]; then node --check dist/m5-runtime.js; fi
@@ -58,10 +63,12 @@ jobs:
           node test.mjs
       - name: Install browser smoke dependencies
         run: |
-          npm install --no-package-lock --no-save playwright@1.55.0 pngjs@7.0.0
+          npm install --no-package-lock --no-save playwright@1.55.0 puppeteer-core@25.10.0 pngjs@7.0.0
           npx playwright install --with-deps chromium
       - name: Verify real browser startup and controls
         run: xvfb-run -a node integration/browser-smoke.mjs
+      - name: Verify independent mobile multi-touch ownership
+        run: xvfb-run -a node integration/mobile-pointer-smoke.mjs
   deploy:
     needs: validate
     if: github.event_name != 'pull_request'
@@ -85,6 +92,7 @@ jobs:
           git -C .vendor/Racing26 remote add origin https://github.com/iLuzionsX/Racing26.git
           git -C .vendor/Racing26 fetch --depth 1 origin abff9f452e4c2b22ac1220a1414418ace3f36e0a
           git -C .vendor/Racing26 checkout --detach FETCH_HEAD
+          node integration/apply-donor-patches.mjs
       - name: Build deployable Racing26 M5 runtime
         run: |
           npm install --no-package-lock --no-save esbuild@0.25.9 three@0.185.1
@@ -107,6 +115,11 @@ jobs:
           else
             mkdir -p production-main/.vendor
             cp -a .vendor/Racing26 production-main/.vendor/Racing26
+            # Production must use its own donor patches, not the preview's patch.
+            git -C production-main/.vendor/Racing26 restore --worktree src/physics/Suspension.ts
+            if [ -f production-main/integration/apply-donor-patches.mjs ]; then
+              node production-main/integration/apply-donor-patches.mjs
+            fi
             npx esbuild production-main/integration/m5-bridge.ts --bundle --format=esm --platform=browser --target=es2022 --external:three --define:import.meta.env.BASE_URL='"./"' --outfile=production-main/dist/m5-runtime.js
             mkdir -p production-main/dist/assets/bmw-m5-g90-default
             cp .vendor/Racing26/public/assets/bmw-m5-g90-default/part-*.b64 production-main/dist/assets/bmw-m5-g90-default/
@@ -115,6 +128,7 @@ jobs:
             cp -a production-main/dist/. site/
             case "${GITHUB_REF_NAME}" in
               astra/progressive-tyre-recovery) PREVIEW_SLUG="pr-17" ;;
+              astra/slide-recovery-unwind) PREVIEW_SLUG="slide-recovery-unwind" ;;
               astra/physics-pipeline-repair) PREVIEW_SLUG="pr-16" ;;
               *) PREVIEW_SLUG="branch-preview" ;;
             esac
@@ -129,3 +143,27 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+      - name: Install deployed-preview browser smoke dependencies
+        if: github.ref_name == 'astra/slide-recovery-unwind'
+        run: |
+          npm install --no-package-lock --no-save playwright@1.55.0 pngjs@7.0.0
+          npx playwright install --with-deps chromium
+      - name: Verify deployed public preview in real Chromium
+        if: github.ref_name == 'astra/slide-recovery-unwind'
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          EXPECTED_COMMIT: ${{ github.sha }}
+        run: |
+          LIVE_URL="${PAGE_URL%/}/previews/slide-recovery-unwind/"
+          passed=0
+          for attempt in 1 2 3; do
+            if RACERRHI_SMOKE_URL="$LIVE_URL" \
+              RACERRHI_EXPECTED_COMMIT="$EXPECTED_COMMIT" \
+              RACERRHI_EXPECTED_DONOR="abff9f452e4c2b22ac1220a1414418ace3f36e0a" \
+              xvfb-run -a node integration/browser-smoke.mjs; then
+              passed=1
+              break
+            fi
+            sleep 10
+          done
+          test "$passed" -eq 1
