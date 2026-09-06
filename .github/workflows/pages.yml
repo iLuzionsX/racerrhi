@@ -134,3 +134,27 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+      - name: Install deployed-preview browser smoke dependencies
+        if: github.ref_name == 'astra/slide-recovery-unwind'
+        run: |
+          npm install --no-package-lock --no-save playwright@1.55.0 pngjs@7.0.0
+          npx playwright install --with-deps chromium
+      - name: Verify deployed public preview in real Chromium
+        if: github.ref_name == 'astra/slide-recovery-unwind'
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          EXPECTED_COMMIT: ${{ github.sha }}
+        run: |
+          LIVE_URL="${PAGE_URL%/}/previews/slide-recovery-unwind/"
+          passed=0
+          for attempt in 1 2 3; do
+            if RACERRHI_SMOKE_URL="$LIVE_URL" \
+              RACERRHI_EXPECTED_COMMIT="$EXPECTED_COMMIT" \
+              RACERRHI_EXPECTED_DONOR="abff9f452e4c2b22ac1220a1414418ace3f36e0a" \
+              xvfb-run -a node integration/browser-smoke.mjs; then
+              passed=1
+              break
+            fi
+            sleep 10
+          done
+          test "$passed" -eq 1
