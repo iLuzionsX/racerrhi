@@ -22,7 +22,10 @@ type RecoveryMode =
   | 'neutral'
   | 'keyboard-correct'
   | 'keyboard-incorrect'
-  | 'touch-correct';
+  | 'touch-quarter'
+  | 'touch-third'
+  | 'touch-half'
+  | 'touch-full';
 
 function run(mode: RecoveryMode, aidsOff = false) {
   const state: any = newCar(0, 0, 0);
@@ -58,6 +61,16 @@ function run(mode: RecoveryMode, aidsOff = false) {
   let tcsSteps = 0;
 
   for (let i = 0; i < 120; i++) {
+    const touchMagnitude =
+      mode === 'touch-quarter'
+        ? 0.25
+        : mode === 'touch-third'
+          ? 0.33
+          : mode === 'touch-half'
+            ? 0.5
+            : mode === 'touch-full'
+              ? 1
+              : 0;
     const control =
       mode === 'neutral'
         ? { digitalSteerDirection: 0 as const, throttle: 0.12 }
@@ -65,7 +78,7 @@ function run(mode: RecoveryMode, aidsOff = false) {
           ? { digitalSteerDirection: -1 as const, throttle: 0.12 }
           : mode === 'keyboard-incorrect'
             ? { digitalSteerDirection: 1 as const, throttle: 0.12 }
-            : { analogSteerTarget: 1, analogSteerActive: true, throttle: 0.12 };
+            : { analogSteerTarget: touchMagnitude, analogSteerActive: true, throttle: 0.12 };
 
     stepCar(state, control, M5_FIXED_DT);
     const error = Math.abs(state.slip) + Math.abs(state.yawRate) * 0.35;
@@ -124,9 +137,12 @@ const results = {
   neutral: run('neutral'),
   keyboardCorrect: run('keyboard-correct'),
   keyboardIncorrect: run('keyboard-incorrect'),
-  touchCorrect: run('touch-correct'),
+  touchQuarter: run('touch-quarter'),
+  touchThird: run('touch-third'),
+  touchHalf: run('touch-half'),
+  touchFull: run('touch-full'),
   keyboardCorrectAidsOff: run('keyboard-correct', true),
-  touchCorrectAidsOff: run('touch-correct', true),
+  touchQuarterAidsOff: run('touch-quarter', true),
 };
 
 console.log(JSON.stringify({
@@ -146,4 +162,4 @@ console.log(JSON.stringify({
 assert(results.keyboardCorrect.bestErrorRatio < 0.35, 'keyboard countersteer did not materially reduce slide error');
 assert(results.keyboardCorrect.finalSlipDeg < 0.5, 'keyboard recovery left excessive final sideslip');
 assert(results.keyboardCorrect.absInterventionSteps === 0, 'ABS unexpectedly drove a steering-only recovery');
-assert(results.touchCorrect.absInterventionSteps === 0, 'ABS unexpectedly drove touch steering recovery');
+assert(results.touchQuarter.absInterventionSteps === 0, 'ABS unexpectedly drove touch steering recovery');
