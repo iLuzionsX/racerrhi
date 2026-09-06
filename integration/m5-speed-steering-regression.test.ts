@@ -191,8 +191,9 @@ for (const speed of [80, 120, 150, 200]) {
       maxStep = Math.max(maxStep, Math.abs(next - current));
       current = next;
     }
-    assert(steps * M5_FIXED_DT >= 0.28, 'recovery steering arrived as an abrupt gain jump');
-    assert(steps * M5_FIXED_DT <= 0.34, 'recovery steering became too slow');
+    assert(steps * M5_FIXED_DT >= 0.12, 'recovery steering arrived as an abrupt gain jump');
+    assert(steps * M5_FIXED_DT <= 0.14, 'severe recovery steering became too slow');
+    assert(maxStep < 0.07, 'recovery steering exceeded its continuous slew bound');
     recoveryMatrix.push({ speedKmh: speed, direction, target, seconds: steps * M5_FIXED_DT, maxStep });
   }
 }

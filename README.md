@@ -59,29 +59,43 @@ barrier contact. After: 1.93–2.86 degrees, no barrier contact or crash-stabili
 intervention. The flattened-track control is unchanged at 2.14 degrees.
 This is a deterministic driver regression, not physical iPhone testing.
 
-## Progressive high-speed touch steering
+## Fixed touch steering and gradual keyboard input
 
-The touch-wheel mapping keeps its existing response through 100 km/h. Above
-that, ordinary full-travel rack demand eases from 30% at 100 km/h to 23.2% at
-150 km/h, 13.3% at 200 km/h and 12% at 220 km/h. A mild cubic input curve also
-adds precision near center at high speed without a deadzone. Genuine opposite
-lock still unlocks the full rack and removes the extra input shaping. Keyboard
-steering, input handoff, tire forces, suspension and rendering remain unchanged.
+Touch maps thumb position to requested rack position with the fixed magnitude
+curve `0.30*x + 0.70*x^4.5`. It has a gentle center, no deadzone, and full mechanical
+lock at full travel. Speed, pedals, yaw and sideslip never change that mapping.
+The donor's existing analog slew and physical rack response remain in place.
 
-`node --import tsx integration/m5-speed-steering-regression.test.ts` sweeps forward
-and reverse speeds, checks symmetry and continuous gain, verifies severe recovery
-authority, and drives left/right 150 and 200 km/h corrections through the bridge.
-For the tested 33.75-degree hand-wheel ramp, hold and release, peak sideslip falls
-from 17.8 to 8.3 degrees at 150 km/h and from 26.3 to 3.6 degrees at 200 km/h.
-These are deterministic simulation comparisons, not a guarantee against sliding
-with larger inputs or a claim of physical phone testing.
+Keyboard holds build toward the donor's speed-dependent cornering envelope in
+about 0.58 seconds. Release and the unwind part of a reversal are faster. Genuine
+countersteer smoothly gains both authority and urgency; at maximum recovery
+severity, buildup takes about 0.12 seconds, close to the donor's recovery slew.
+Ordinary steering does not receive that recovery rate. Tyres, braking, suspension,
+chassis stabilization and rendering are unchanged.
+
+`integration/m5-speed-steering-regression.test.ts` checks the fixed touch map and
+keyboard timing at 0/50/80/120/150/200 km/h, state independence, symmetry, reversal,
+and bounded recovery slew. `integration/m5-slide-unwind-regression.test.ts` checks
+30 explicit left/right recovery plans at 70/80/92 km/h. Touch plans state their
+travel, 100 ms wind-on, hold and unwind times; larger disturbances require more
+deliberate thumb travel. All practical cases must settle with at most 1 deg/s
+opposite yaw and 0.25 degrees opposite sideslip. The original tighter 80 km/h
+heading, path, speed-loss and settling limits remain enforced.
+
+The report also retains unchanged old thumb scripts as diagnostics, which can
+under-correct or over-correct with the new map. Historical held-countersteer
+measurements replay the frozen pre-redesign input law. Natural braking/kerb
+comparisons express the old rack demand through the new curve to isolate physics
+from changed hand travel. That reference conversion exists only in test fixtures;
+the runtime touch controller has no automatic recovery gain. Automated browser
+and multitouch tests cannot establish subjective feel or latency on a real phone.
 
 ## Thumb-controlled on-screen wheel
 
 The default wheel gesture is now a relative horizontal drag: grab anywhere on
 the wheel, slide left/right, and lift to center. Vertical drift does not steer;
 pointer capture keeps the gesture working outside the rim. Full ordinary travel
-takes 55% of the displayed wheel width in either direction at 100% sensitivity.
+takes 45% of the displayed wheel width in either direction at 100% sensitivity.
 Moving back from an overdrag immediately unwinds, with no accumulated dead travel.
 The wheel graphic turns up to 72 degrees either way so its center marker remains
 readable. Input is applied directly; the M5's existing steering slew is unchanged.

@@ -117,7 +117,7 @@ export function updateRacerrhiKeyboardSteeringInput(
 
     const remainingDt = dt - timeToCenter;
     const recoveryUrgency = Math.sqrt(PhysicsMath.clamp(recoveryBlend, 0, 1));
-    const windTime = PhysicsMath.lerp(0.58, 0.28, recoveryUrgency);
+    const windTime = PhysicsMath.lerp(0.58, 0.12, recoveryUrgency);
     const windRate = Math.abs(target) / Math.max(0.05, windTime);
     return moveToward(0, target, windRate * remainingDt);
   }
@@ -139,9 +139,10 @@ export function updateRacerrhiKeyboardSteeringInput(
 
   // Normal wind-on takes ~0.58 s from center to the current ordinary limit,
   // independent of whether that limit is 100% rack at parking speed or only a
-  // few percent at 200 km/h. Severe recovery smoothly shortens that to 0.30 s.
+  // few percent at 200 km/h. Severe recovery smoothly shortens that to 0.12 s,
+  // close to the donor's full-recovery slew, without a target or rate jump.
   const recoveryUrgency = Math.sqrt(PhysicsMath.clamp(recoveryBlend, 0, 1));
-  const windTime = PhysicsMath.lerp(0.58, 0.28, recoveryUrgency);
+  const windTime = PhysicsMath.lerp(0.58, 0.12, recoveryUrgency);
   const windRate = Math.abs(target) / Math.max(0.05, windTime);
   return moveToward(current, target, windRate * dt);
 }
