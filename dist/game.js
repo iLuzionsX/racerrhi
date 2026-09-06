@@ -58,13 +58,12 @@ for(const t of [.145,.30,.445,.61,.735,.845]){for(let i=0;i<3;i++){const marker=
 for(let i=0;i<10;i++){const t=.09+i*.006,a=at(t),p=a.p.clone().addScaledVector(a.n,28);for(let j=0;j<5;j++){const bench=box(2,.7,9,mat(j%2?'#b8bdae':'#344e46'),p.x+j*1.25*a.n.x,p.y+.8+j*.75,p.z+j*1.25*a.n.z,Math.atan2(a.d.x,a.d.z));}}
 furniture(scene,at,length);
 $('loadbar').style.width='65%';$('loadtext').textContent='Preparing the BMW M5 G90…';
-const car=new T.Group(),body=new T.Group();car.add(body);scene.add(car);let wheels=[],modelLoaded=false;
+const car=new T.Group(),body=new T.Group();car.add(body);scene.add(car);let wheels=[],modelLoaded=false;const chassisCgLocalY=.52-.035;
 try{
  const visual=await loadM5Visual();
  const model=visual.group;
  // The compact visual is ground-referenced. Pivot the chassis about the real M5 CG
  // while leaving the wheel assemblies road-relative under the car root.
- const chassisCgLocalY=.52-.035;
  body.position.y=chassisCgLocalY;
  model.position.y=-chassisCgLocalY;
  body.add(model);
