@@ -144,7 +144,7 @@ const hdrLoad=visualsSource.indexOf("const hdr=await new RGBELoader()"),qualityR
 assert(hdrLoad>=0&&qualityReturn>hdrLoad,'HDR environment must load before the surface-quality callback returns');
 assert(visualsSource.includes("material.normalMap=maps[1]")&&visualsSource.includes("material.roughnessMap=maps[2]"));
 assert(assetSource.includes("'sand','2k',[['nor_gl','normal'],['Rough','rough']]")&&assetSource.includes("'dirt','2k',[['nor_gl','normal'],['Rough','rough']]"));
-assert(gameSource.includes("if(runoffQualityReady)reloadSurfaceQuality(config.quality)")&&!gameSource.includes("config.quality==='balanced')reloadSurfaceQuality");
+assert(gameSource.includes("if(runoffQualityReady)reloadSurfaceQuality(config.quality)")&&!gameSource.includes("config.quality==='balanced')reloadSurfaceQuality"));
 assert(gameSource.includes("trackDetailQuality(config.quality)")&&gameSource.includes("},250);"));
 assert(graphicsSource.includes("high?256:96")&&graphicsSource.includes("clearcoatRoughness:.032"));
 console.log('PASS high graphics path uses HDR reflections, full PBR runoff maps, live quality switching and roadside micro-detail');
