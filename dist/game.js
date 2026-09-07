@@ -5,7 +5,7 @@ import * as T from 'three';
 import {clamp} from './controls.mjs?v=4';
 import {M5_FIXED_DT,stepCar,newCar,advanceLap,setSurfaceSampler,resolveBoundaryContact,loadM5Visual,captureM5RenderSnapshot,interpolateM5RenderSnapshots,rebaseM5RenderSnapshotPose,createM5StepScheduler,resetM5StepScheduler,pauseM5StepScheduler,consumeM5FrameTime} from './physics.mjs?v=4';
 import {config,input as touchInput,clearInput,sessionVisible} from './ui.js?v=7';
-import {surfaces,foliage,furniture} from './visuals.js';
+import {surfaces,foliage,furniture} from './visuals.js?v=2';
 import {chaseCameraProfile} from './chase-camera.mjs';
 import {bonnetCameraProfile} from './bonnet-camera.mjs';
 import {createRewardState,chooseChallenge,awardSkill,stepFlow,rollDisplayScore,formatScore,ghostDelta,formatDelta} from './reward-loop.mjs?v=1';
