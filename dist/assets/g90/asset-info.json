@@ -1,0 +1,48 @@
+{
+  "source": "https://sketchfab.com/3d-models/bmw-g90-m5-9dc9e5c88bec4faa94552fdd0b76ed21",
+  "author": "JUSTGAME",
+  "license": "CC-BY-4.0",
+  "sourceSha256": "842f7d94ca1e93cd3ce66abd622638818da3d39edf94a70462552a92aa2f76dc",
+  "sourceTriangles": 378333,
+  "omittedTriangles": 58416,
+  "renderTriangles": 319917,
+  "assemblies": [
+    {
+      "name": "body",
+      "primitives": 27
+    },
+    {
+      "name": "wheel_FL",
+      "primitives": 10
+    },
+    {
+      "name": "wheel_FR",
+      "primitives": 10
+    },
+    {
+      "name": "wheel_RL",
+      "primitives": 10
+    },
+    {
+      "name": "wheel_RR",
+      "primitives": 10
+    },
+    {
+      "name": "caliper_FL",
+      "primitives": 4
+    },
+    {
+      "name": "caliper_FR",
+      "primitives": 4
+    },
+    {
+      "name": "caliper_RL",
+      "primitives": 2
+    },
+    {
+      "name": "caliper_RR",
+      "primitives": 2
+    }
+  ],
+  "bytes": 2487912
+}

@@ -1,4 +1,5 @@
-import {detailedWheel,upgradeCar,localReflections} from './graphics.mjs?v=2';
+import {upgradeCar,localReflections} from './graphics.mjs?v=3';
+import {loadG90Visual} from './g90-visual.mjs?v=1';
 import {nearestRoadProjection} from './road-projection.mjs';
 import {wheelVisualHubY} from './wheel-contact.mjs';
 import * as T from 'three';
@@ -69,7 +70,7 @@ furniture(scene,at,length);const trackDetailQuality=trackDetail(scene,at,length)
 $('loadbar').style.width='65%';$('loadtext').textContent='Preparing the BMW M5 G90…';
 const car=new T.Group(),body=new T.Group();car.add(body);scene.add(car);let reflections,reflectiveMaterials=[],wheels=[],modelLoaded=false;const chassisCgLocalY=.52-.035;
 try{
- const visual=await loadM5Visual();
+ const visual=await loadG90Visual();
  const model=visual.group;
  // The compact visual is ground-referenced. Pivot the chassis about the real M5 CG
  // while leaving the wheel assemblies road-relative under the car root.
@@ -85,8 +86,10 @@ try{
    // Keep steering and rolling on separate transform nodes. Combining them on one
    // Euler rotation makes a steered spinning wheel precess/tumble visually.
    const steerPivot=new T.Group(),spinPivot=new T.Group();
-   spinPivot.add(detailedWheel(Math.sign(x)));steerPivot.add(spinPivot);
-   const caliper=new T.Mesh(new T.BoxGeometry(.075,.19,.09),new T.MeshStandardMaterial({color:0x245cac,metalness:.55,roughness:.3}));caliper.position.set(Math.sign(x)*.065,0,-.17);steerPivot.add(caliper);
+   const assembly=visual.wheelAssemblies[id];
+   spinPivot.add(assembly.wheel);steerPivot.add(spinPivot);
+   steerPivot.add(assembly.caliper);
+   steerPivot.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
    // `car` sits 35 mm above the sampled road. Keep the hub at the physical
    // 369 mm wheel radius and do NOT inherit chassis pitch/roll from `body`.
    steerPivot.position.set(x,.369-.035,z);

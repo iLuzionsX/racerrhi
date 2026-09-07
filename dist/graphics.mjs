@@ -53,10 +53,10 @@ export function upgradeCar(model){
    if(cache.has(old))return cache.get(old);
    const tag=((old.name||'')+' '+(o.name||'')).toLowerCase();
    let m=old;
-   if(tag.includes('paint')||tag.includes('bodycolor')||tag.includes('body_color')){
+   if(tag.includes('carpaint')||tag.includes('bodycolor')||tag.includes('body_color')){
     m=makePhysical(old,{color:new T.Color(0x164d80),metalness:.72,roughness:.205,clearcoat:1,clearcoatRoughness:.032,envMapIntensity:1.7});
-   }else if(tag.includes('window')||tag.includes('glass')||tag.includes('windscreen')){
-    m=makePhysical(old,{color:new T.Color(0x0d1a24),metalness:.22,roughness:.035,clearcoat:1,clearcoatRoughness:.018,envMapIntensity:1.65});
+   }else if(tag.includes('window')||tag.includes('glass_int')||tag.includes('windscreen')){
+    m=makePhysical(old,{metalness:.10,roughness:.055,clearcoat:1,clearcoatRoughness:.025,envMapIntensity:1.1});
    }else if(tag.includes('chrome')||tag.includes('mirror')||tag.includes('trim')){
     m=old.clone();m.metalness=1;m.roughness=Math.min(.10,m.roughness??.1);m.envMapIntensity=1.65;
    }else if(old.isMeshStandardMaterial||old.isMeshPhysicalMaterial){

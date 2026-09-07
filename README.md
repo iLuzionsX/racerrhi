@@ -26,6 +26,7 @@ Upload this repository to a new GitHub repository with default branch `main`. In
 
 ## Credits
 
+- High-detail BMW G90 M5 by [JUSTGAME](https://sketchfab.com/JUSTGAME), [source model](https://sketchfab.com/3d-models/bmw-g90-m5-9dc9e5c88bec4faa94552fdd0b76ed21), licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Converted, material-calibrated, batched, and aligned to the existing M5 physics rig. Attribution and source hash are in `dist/assets/g90/`.
 - BMW M5 G90 exterior runtime and M5 physics donor: `iLuzionsX/Racing26`, pinned by the Pages build to commit `abff9f452e4c2b22ac1220a1414418ace3f36e0a`. BMW names/marks belong to their owners; no affiliation is claimed.
 - Three.js 0.180.0: MIT, included in `dist/assets/THREE-LICENSE.txt`.
 - Poly Haven CC0: Asphalt 02, Leafy Grass, Rock Boulder Cracked PBR maps and Grasslands Sunset HDR at 2K; Sandy Gravel 02 and Dirt Aerial 02 use lightweight 1K color maps in Balanced and 4K albedo maps in High for the runoff shoulders. `download-assets-hq.mjs` records reproducible source downloads. See https://polyhaven.com/license .
@@ -139,5 +140,13 @@ The sampled track geometry, material blending and pinned donor remain intact.
 
 
 ## Console graphics preview
+
+### Full-detail G90 replacement
+
+`astra/next-gen-g90` replaces the untextured LOD-C body with the downloaded full-detail G90, including interior, lamps, badges, grille textures, wheel meshes and separate brake calipers. About 320k triangles remain after removing the closed-hood engine; Draco and WebP reduce the 29MB original to 2.5MB. No mesh simplification is applied. Geometry is batched into nine physics-aligned assemblies. Mis-parented rear rim components in the source are reassigned by position. The fixed-step donor physics, track, steering, UI and cameras are unchanged.
+
+To reproduce conversion, install `@gltf-transform/core`, `@gltf-transform/extensions`, `@gltf-transform/functions`, `draco3dgltf`, `sharp`, and `three`, then run `node integration/prepare-g90.mjs /path/to/bmw_g90_m5.glb` with the official licensed Sketchfab download. The optimized GLB is checked in; production does not require Sketchfab credentials.
+
+The older console-graphics notes below describe the preceding pass, not the new body.
 
 `astra/console-graphics` combines the unmerged intuitive steering and reward loop branches; main is unchanged. Visual additions: 2K Poly Haven color/normal/roughness maps and HDR, circuit-local cubemap reflections (128px High / 64px Balanced), physical clearcoat paint and glass, 96-segment rounded tyres with tread, ten-spoke alloys, drilled discs and stationary calipers, tree trunks and denser trackside tyre geometry. High uses 4096px desktop / 2048px mobile shadows. The original compact M5 body and pinned donor physics are preserved; a full-detail body requires the original asset. Reflection captures use nearby solid scenery proxies and omit the car and distant foliage. Existing quality settings control capture frequency and resolution.

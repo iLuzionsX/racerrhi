@@ -1,7 +1,7 @@
 name: Publish APEX to GitHub Pages
 on:
   push:
-    branches: [main, astra/physics-pipeline-repair, astra/progressive-tyre-recovery, astra/slide-recovery-unwind, astra/chassis-wheel-visual-sync, astra/progressive-speed-steering, astra/slide-braking-friction, astra/intuitive-steering-inputs, astra/vegas-reward-loop, astra/console-graphics]
+    branches: [main, astra/physics-pipeline-repair, astra/progressive-tyre-recovery, astra/slide-recovery-unwind, astra/chassis-wheel-visual-sync, astra/progressive-speed-steering, astra/slide-braking-friction, astra/intuitive-steering-inputs, astra/vegas-reward-loop, astra/console-graphics, astra/next-gen-g90]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -152,6 +152,7 @@ jobs:
               astra/progressive-speed-steering) PREVIEW_SLUG="progressive-speed-steering" ;;
               astra/slide-braking-friction) PREVIEW_SLUG="slide-braking-friction" ;;
               astra/console-graphics) PREVIEW_SLUG="console-graphics" ;;
+              astra/next-gen-g90) PREVIEW_SLUG="next-gen-g90" ;;
               astra/intuitive-steering-inputs) PREVIEW_SLUG="intuitive-steering-inputs" ;;
               astra/vegas-reward-loop) PREVIEW_SLUG="vegas-reward-loop" ;;
               astra/chassis-wheel-visual-sync) PREVIEW_SLUG="chassis-wheel-visual-sync" ;;
@@ -170,12 +171,12 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
       - name: Install deployed-preview browser smoke dependencies
-        if: github.ref_name == 'astra/console-graphics' || github.ref_name == 'astra/slide-recovery-unwind' || github.ref_name == 'astra/progressive-speed-steering' || github.ref_name == 'astra/slide-braking-friction' || github.ref_name == 'astra/intuitive-steering-inputs'
+        if: github.ref_name == 'astra/next-gen-g90' || github.ref_name == 'astra/console-graphics' || github.ref_name == 'astra/slide-recovery-unwind' || github.ref_name == 'astra/progressive-speed-steering' || github.ref_name == 'astra/slide-braking-friction' || github.ref_name == 'astra/intuitive-steering-inputs'
         run: |
           npm install --no-package-lock --no-save playwright@1.55.0 pngjs@7.0.0
           npx playwright install --with-deps chromium
       - name: Verify deployed public preview in real Chromium
-        if: github.ref_name == 'astra/console-graphics' || github.ref_name == 'astra/slide-recovery-unwind' || github.ref_name == 'astra/progressive-speed-steering' || github.ref_name == 'astra/slide-braking-friction' || github.ref_name == 'astra/intuitive-steering-inputs'
+        if: github.ref_name == 'astra/next-gen-g90' || github.ref_name == 'astra/console-graphics' || github.ref_name == 'astra/slide-recovery-unwind' || github.ref_name == 'astra/progressive-speed-steering' || github.ref_name == 'astra/slide-braking-friction' || github.ref_name == 'astra/intuitive-steering-inputs'
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
           EXPECTED_COMMIT: ${{ github.sha }}
