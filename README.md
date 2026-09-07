@@ -66,8 +66,14 @@ curve `0.30*x + 0.70*x^4.5`. It has a gentle center, no deadzone, and full mecha
 lock at full travel. Speed, pedals, yaw and sideslip never change that mapping.
 The donor's existing analog slew and physical rack response remain in place.
 
-Keyboard holds build toward the donor's speed-dependent cornering envelope in
-about 0.58 seconds. Release and the unwind part of a reversal are faster. Genuine
+Settings → Keyboard has independent **Response speed** (70–180%) and **Turn
+strength** (75–125%) sliders, saved on this device. The new default is 125% response
+and 100% strength: approximately 0.46 seconds to build ordinary steering, versus
+0.58 seconds at the previous 100% response. Strength adjusts the requested
+cornering envelope, not available tyre grip; more can produce scrub or a slide.
+Touch sensitivity remains separate. Reset Controls restores all control defaults.
+
+Keyboard holds build toward the donor's speed-dependent cornering envelope. Release and the unwind part of a reversal are faster. Genuine
 countersteer smoothly gains both authority and urgency; at maximum recovery
 severity, buildup takes about 0.12 seconds, close to the donor's recovery slew.
 Ordinary steering does not receive that recovery rate. Tyres, braking, suspension,
@@ -105,3 +111,18 @@ the gesture instead of jumping half a turn. Existing saved pedal positions, whee
 size and sensitivity are retained. Browser regressions cover center grabs, small
 corrections, vertical drift, overdrag/reversal, release/re-grab, the saved rotary
 option, and independent pedal/steering pointer ownership.
+
+## Visible tyre contact
+
+The physical M5 compresses its tyres by roughly 19–22 mm under static load, while
+the rendered asphalt is raised another 20 mm above the physics surface. A rigid
+cylinder drawn directly at the physical hub therefore appeared buried by roughly
+39–42 mm. The visual wheel now clears the rendered surface using the cylinder's
+support along the road normal, including wheel width and steering on slopes.
+Only the visible hub height is corrected; physical hub motion, contact forces,
+load transfer, braking, chassis alignment and airborne motion are retained.
+
+Regression coverage includes settings bounds, response/strength independence,
+settings persistence into live physics, the faster default's 18 keyboard recovery
+cases, and mesh clearance on flat/uphill/downhill surfaces. The full donor,
+braking, load, recovery, handoff and browser suites remain deployment gates.

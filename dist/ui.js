@@ -1,4 +1,4 @@
-import {defaults,sanitize,bounds,clamp,angleDelta,thumbSteer} from './controls.mjs?v=3';
+import {defaults,sanitize,bounds,clamp,angleDelta,thumbSteer} from './controls.mjs?v=4';
 const $=id=>document.getElementById(id);
 export const config=sanitize((()=>{try{return JSON.parse(localStorage.getItem('apex-controls-v2'));}catch{return {};}})());
 export const input={steer:0,throttle:0,brake:0,held:false};
@@ -43,7 +43,7 @@ function animate(now){
   wheel.setAttribute('aria-valuenow',Math.round(input.steer*100));requestAnimationFrame(animate);
 }
 requestAnimationFrame(animate);
-const fields={'sensitivity':['sensitivity',100],'wheel-size':['wheelSize',1],'pedal-size':['pedalSize',1],'wheel-x':['wheelX',100],'wheel-y':['wheelY',100],'pedal-x':['pedalX',100],'pedal-y':['pedalY',100]};
+const fields={'keyboard-response':['keyboardResponse',100],'keyboard-strength':['keyboardStrength',100],'sensitivity':['sensitivity',100],'wheel-size':['wheelSize',1],'pedal-size':['pedalSize',1],'wheel-x':['wheelX',100],'wheel-y':['wheelY',100],'pedal-x':['pedalX',100],'pedal-y':['pedalY',100]};
 function refresh(){for(const [id,[key,factor]] of Object.entries(fields)){$(id).value=Math.round(config[key]*factor);$(id+'-value').textContent=$(id).value+(id.includes('size')?' px':'%');}$('wheel-mode').value=config.wheelMode;$('wheel-caption').textContent=config.wheelMode==='drag'?'SLIDE TO STEER':'ROTATE TO STEER';$('wheel-hint').textContent=config.wheelMode==='drag'?'Touch anywhere on the wheel and slide left or right. Lift to center.':'Rotate around the rim to steer. Lift to center.';$('show-controls').checked=config.show;$('quality').value=config.quality;$('engine-sound').checked=config.sound;layout();}
 for(const [id,[key,factor]] of Object.entries(fields))$(id).oninput=()=>{config[key]=Number($(id).value)/factor;refresh();save();};
 $('wheel-mode').onchange=()=>{clearInput();config.wheelMode=$('wheel-mode').value;refresh();save();};
@@ -53,7 +53,7 @@ $('open-settings').onclick=$('pause-settings').onclick=settings;$('close-setting
 $('edit-layout').onclick=()=>{editing=true;clearInput();$('settings').close();document.body.classList.add('editing');$('layout-editor').hidden=false;layout();};
 $('finish-layout').onclick=()=>{editing=false;drag=null;document.body.classList.remove('editing');$('layout-editor').hidden=true;save();refresh();$('settings').showModal();};
 for(const el of document.querySelectorAll('.movable')){el.addEventListener('pointerdown',e=>{if(!editing)return;e.preventDefault();const r=el.getBoundingClientRect();drag={id:e.pointerId,key:el.dataset.control,dx:e.clientX-r.left,dy:e.clientY-r.top,w:r.width,h:r.height};el.setPointerCapture(e.pointerId);});el.addEventListener('pointermove',e=>{if(!drag||drag.id!==e.pointerId)return;const key=drag.key==='wheel'?'wheel':'pedal';config[key+'X']=clamp((e.clientX-drag.dx-14)/Math.max(1,innerWidth-drag.w-28),0,1);config[key+'Y']=clamp((e.clientY-drag.dy-14)/Math.max(1,innerHeight-drag.h-28),0,1);layout();});el.addEventListener('pointerup',()=>{drag=null;save();});el.addEventListener('pointercancel',()=>{drag=null;});}
-$('defaults').onclick=()=>{const d=defaults();for(const k of ['show','sensitivity','wheelMode','wheelSize','pedalSize','wheelX','wheelY','pedalX','pedalY'])config[k]=d[k];save();refresh();};
+$('defaults').onclick=()=>{const d=defaults();for(const k of ['show','sensitivity','keyboardResponse','keyboardStrength','wheelMode','wheelSize','pedalSize','wheelX','wheelY','pedalX','pedalY'])config[k]=d[k];save();refresh();};
 $('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen();}catch{$('fullscreen').textContent='Use your browser fullscreen option';}};
 for(const el of document.querySelectorAll('[data-session]'))el.onclick=()=>{session=el.dataset.session;for(const b of document.querySelectorAll('[data-session]')){b.classList.toggle('selected',b===el);b.setAttribute('aria-pressed',String(b===el));}};
 $('drive').onclick=()=>command('start',session);$('camera').onclick=()=>command('camera');$('pause').onclick=()=>{clearInput();command('pause',true);$('pause-dialog').showModal();};$('resume').onclick=()=>{$('pause-dialog').close();command('pause',false);};$('restart').onclick=()=>{$('pause-dialog').close();command('restart');};$('exit').onclick=()=>{$('pause-dialog').close();command('exit');};$('pause-dialog').oncancel=()=>command('pause',false);

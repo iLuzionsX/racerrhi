@@ -579,7 +579,8 @@ for(const key of ['x','y','z','heading','speed','yawRate','slip'] as const) {
   assert(game.includes('consumeM5FrameTime(physicsClock,rawDt'));
   assert(game.includes('interpolateM5RenderSnapshots(renderPrevious,renderCurrent,timing.alpha)'));
   assert(game.includes('wheelStateById.get(w.userData.id)'));
-  assert(game.includes('ws.hubWorldPos.y-car.position.y'));
+  assert(game.includes('wheelVisualHubY(ws.hubWorldPos.y,wheelRoad,renderState.yawRad+ws.steerAngleRad)'));
+  assert(game.includes('visualHubY-car.position.y'));
 }
 
 console.log(JSON.stringify({

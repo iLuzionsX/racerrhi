@@ -119,6 +119,8 @@ export type M5ControlInput = {
   throttle?: number;
   brake?: number;
   handbrake?: boolean;
+  keyboardResponse?: number;
+  keyboardStrength?: number;
   /** Binary keyboard/button intent. +1 is donor left, -1 donor right. */
   digitalSteerDirection?: -1 | 0 | 1;
   /** Racerrhi on-screen hand-wheel target in [-1, 1]. */
@@ -460,7 +462,8 @@ function steeringInputsForStep(sim: Simulation, input: M5ControlInput) {
       sim,
       sim.digitalSteeringInput,
       direction,
-      sim.fixedDt
+      sim.fixedDt,
+      input
     );
     sim.resetAnalogSteeringInput(0);
     sim.resetDigitalSteeringInput(nextDigital);

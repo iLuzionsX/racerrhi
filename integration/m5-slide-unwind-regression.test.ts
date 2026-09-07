@@ -27,6 +27,7 @@ type DriverPlan = {
   holdMs: number;
   unwindMs: number;
   rampMs?: number;
+  keyboardResponse?: number;
   incorrect?: boolean;
   tapPeriodMs?: number;
   tapOnMs?: number;
@@ -209,7 +210,7 @@ function runInjected(
 
   for (let i = 0; i < steps; i++) {
     const elapsedMs = i * DT_MS;
-    const input = driverInput(plan, directionSign, elapsedMs);
+    const input = { ...driverInput(plan, directionSign, elapsedMs), keyboardResponse: plan.keyboardResponse };
     const preProbe = probeChassisContact(sim.vehicle);
     if (preProbe.contactCount > 0) chassisContactSamples++;
 
@@ -763,6 +764,16 @@ const unchangedThumbScripts = ([1, -1] as const).flatMap((direction) =>
     { name: 'old-touch-45', kind: 'touch' as const, reactionMs: 220, amplitude: 0.45, holdMs: 220, unwindMs: 340 },
   ].map((plan) => runInjected(direction, disturbance, plan)))
 );
+// Faster user response needs proportionately shorter key holds. Verify the new
+// shipped default with explicit driver timing; retain the original 100% matrix.
+const defaultKeyboardResults = ([1, -1] as const).flatMap((direction) =>
+  disturbances.flatMap((disturbance) => usefulPlans.filter(p => p.kind === 'keyboard').map((p) => {
+    const plan = practicalPlan(p, disturbance.speedKmh);
+    return runInjected(direction, disturbance, { ...plan, keyboardResponse: 1.25, holdMs: plan.holdMs / 1.25 });
+  }))
+);
+assert(defaultKeyboardResults.every(r => r.success && r.oppositeYawPeakDegS <= 1 && r.oppositeSlipPeakDeg <= .25), 'faster default keyboard recovery did not unwind cleanly');
+
 const adverseResults = injectedResults.filter((result) =>
   adversePlans.some((plan) => plan.name === result.plan)
 );
@@ -801,6 +812,7 @@ const summary = {
   naturalResults,
   naturalSteeringProfile: 'pre-redesign rack demand expressed through the fixed touch curve',
   unchangedThumbScripts,
+  defaultKeyboardResults,
   injectedResults,
 };
 

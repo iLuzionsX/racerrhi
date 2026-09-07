@@ -33,7 +33,12 @@ export function racerrhiSteeringTargetForM5(
   return PhysicsMath.clamp(-racerrhiFixedTouchCurve(racerrhiSteer), -1, 1);
 }
 
-function steeringContext(sim: Simulation) {
+export type KeyboardTuning = { keyboardResponse?: number; keyboardStrength?: number };
+function tuningValue(value: number | undefined, min: number, max: number) {
+  return PhysicsMath.clamp(Number.isFinite(value) ? Number(value) : 1, min, max);
+}
+
+function steeringContext(sim: Simulation, tuning: KeyboardTuning = {}) {
   const localVelocity = sim.vehicle.rigidBody.getLocalVelocity();
   const localAngularVelocity = sim.vehicle.rigidBody.getLocalAngularVelocity();
   const speedMs = Math.hypot(localVelocity.x, localVelocity.z);
@@ -51,15 +56,17 @@ function steeringContext(sim: Simulation) {
       yawRateRadS: localAngularVelocity.y,
       sideslipRad,
       forwardSpeedMs: localVelocity.z,
+      targetLateralAccelerationG: 0.88 * tuningValue(tuning.keyboardStrength, 0.75, 1.25),
     },
   };
 }
 
 export function racerrhiKeyboardTargetForM5(
   sim: Simulation,
-  direction: -1 | 0 | 1
+  direction: -1 | 0 | 1,
+  tuning: KeyboardTuning = {}
 ): number {
-  const { speedMs, context } = steeringContext(sim);
+  const { speedMs, context } = steeringContext(sim, tuning);
   return digitalSteeringTarget(direction, speedMs, context);
 }
 
@@ -86,12 +93,14 @@ export function updateRacerrhiKeyboardSteeringInput(
   sim: Simulation,
   currentInput: number,
   direction: -1 | 0 | 1,
-  dt: number
+  dt: number,
+  tuning: KeyboardTuning = {}
 ): number {
   const current = PhysicsMath.clamp(Number(currentInput) || 0, -1, 1);
   if (!(dt > 0)) return current;
 
-  const { speedMs, context } = steeringContext(sim);
+  const { speedMs, context } = steeringContext(sim, tuning);
+  const ordinaryWindTime = 0.58 / tuningValue(tuning.keyboardResponse, 0.70, 1.80);
   const target = digitalSteeringTarget(direction, speedMs, context);
   const recoveryBlend = digitalCountersteerRecoveryBlend(
     direction,
@@ -117,7 +126,7 @@ export function updateRacerrhiKeyboardSteeringInput(
 
     const remainingDt = dt - timeToCenter;
     const recoveryUrgency = Math.sqrt(PhysicsMath.clamp(recoveryBlend, 0, 1));
-    const windTime = PhysicsMath.lerp(0.58, 0.12, recoveryUrgency);
+    const windTime = PhysicsMath.lerp(ordinaryWindTime, 0.12, recoveryUrgency);
     const windRate = Math.abs(target) / Math.max(0.05, windTime);
     return moveToward(0, target, windRate * remainingDt);
   }
@@ -142,7 +151,7 @@ export function updateRacerrhiKeyboardSteeringInput(
   // few percent at 200 km/h. Severe recovery smoothly shortens that to 0.12 s,
   // close to the donor's full-recovery slew, without a target or rate jump.
   const recoveryUrgency = Math.sqrt(PhysicsMath.clamp(recoveryBlend, 0, 1));
-  const windTime = PhysicsMath.lerp(0.58, 0.12, recoveryUrgency);
+  const windTime = PhysicsMath.lerp(ordinaryWindTime, 0.12, recoveryUrgency);
   const windRate = Math.abs(target) / Math.max(0.05, windTime);
   return moveToward(current, target, windRate * dt);
 }

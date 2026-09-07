@@ -174,6 +174,31 @@ for (const speed of [0, 50, 80, 120, 150, 200]) {
   });
 }
 
+// User response and strength are independent: timing changes without changing
+// the endpoint; strength changes the ordinary target without changing timing.
+for (const speed of [0, 50, 80, 120, 150, 200]) {
+  for (const response of [.70, 1, 1.25, 1.80]) for (const strength of [.75, 1, 1.25]) {
+    for (const sign of [-1, 1] as const) {
+      const tuning = { keyboardResponse: response, keyboardStrength: strength };
+      setLocalMotion(sim, speed);
+      const target = racerrhiKeyboardTargetForM5(sim, sign, tuning);
+      let current = 0, ticks = 0;
+      while (Math.abs(current-target)>1e-10 && ticks<240) {
+        current=updateRacerrhiKeyboardSteeringInput(sim,current,sign,M5_FIXED_DT,tuning);
+        ticks++;
+      }
+      assert(Math.abs(ticks*M5_FIXED_DT-.58/response)<=M5_FIXED_DT+1e-9, 'keyboard setting changed time normalization');
+      assert(Math.abs(target)<=1 && target*sign>0, 'keyboard tuning exceeded mechanical lock');
+      const ordinary=racerrhiKeyboardTargetForM5(sim,sign);
+      if(speed>=50) assert(strength<1?Math.abs(target)<Math.abs(ordinary):strength>1?Math.abs(target)>Math.abs(ordinary):target===ordinary);
+      const state:any=newCar(0,0,0);setCarPose(state,0,0,0,speed/3.6);
+      const expected=updateRacerrhiKeyboardSteeringInput(state._m5,0,sign,M5_FIXED_DT,tuning);
+      stepCar(state,{digitalSteerDirection:sign,...tuning},M5_FIXED_DT);
+      assert(Math.abs(state._m5.digitalSteeringInput-expected)<1e-12,'game bridge ignored keyboard settings');
+    }
+  }
+}
+
 // Severe recovery keeps full keyboard authority, but the new adapter ramps it
 // rather than injecting a state-dependent steering jump.
 const recoveryMatrix: any[] = [];

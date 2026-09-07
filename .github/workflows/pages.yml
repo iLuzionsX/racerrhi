@@ -73,6 +73,12 @@ jobs:
         run: xvfb-run -a node integration/browser-smoke.mjs
       - name: Verify independent mobile multi-touch ownership
         run: xvfb-run -a node integration/mobile-pointer-smoke.mjs
+      - name: Save rendered handling preview for visual review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: handling-visual-review
+          path: artifacts/handling-preview.png
   deploy:
     needs: validate
     if: github.event_name != 'pull_request'
