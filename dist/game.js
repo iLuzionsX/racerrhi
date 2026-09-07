@@ -26,7 +26,7 @@ function mesh(geo,material,x=0,y=0,z=0){const m=new T.Mesh(geo,material);m.posit
 function box(w,h,d,material,x,y,z,rotation=0){const m=mesh(new T.BoxGeometry(w,h,d),material,x,y,z);m.rotation.y=rotation;m.castShadow=true;return m;}
 function texture(type){const c=document.createElement('canvas');c.width=c.height=256;const ctx=c.getContext('2d'),im=ctx.createImageData(256,256);for(let i=0;i<im.data.length;i+=4){const n=rand();let a=type==='road'?71+n*34:130+n*52;im.data[i]=a;im.data[i+1]=type==='road'?a*1.025:a*.91;im.data[i+2]=type==='road'?a*1.02:a*.71;im.data[i+3]=255;}ctx.putImageData(im,0,0);const tx=new T.CanvasTexture(c);tx.wrapS=tx.wrapT=T.RepeatWrapping;tx.colorSpace=T.SRGBColorSpace;tx.anisotropy=renderer.capabilities.getMaxAnisotropy();return tx;}
 const roadMat=mat('#a2a7a4');roadMat.map=texture('road');const sandMat=mat('#b6a68a'),dirtMat=mat('#75684e');
-sandMat.userData.texturePrefix=config.quality==='high'?'sand':'sand-2k';dirtMat.userData.texturePrefix=config.quality==='high'?'dirt':'dirt-2k';
+sandMat.userData.textureQuality=config.quality;dirtMat.userData.textureQuality=config.quality;
 const points=[V(-225,13,-200),V(-225,13,50),V(-185,16,245),V(-55,22,325),V(100,27,265),V(155,24,115),V(290,22,65),V(300,20,-65),V(170,18,-110),V(85,14,-225),V(185,11,-320),V(70,11,-385),V(-110,12,-345)];
 const curve=new T.CatmullRomCurve3(points,true,'centripetal');curve.arcLengthDivisions=4000;const length=curve.getLength(),N=1400;
 $('length').textContent=(length/1000).toFixed(2);

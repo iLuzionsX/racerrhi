@@ -4,20 +4,20 @@ const dir=new URL('./dist/assets/terrain/',import.meta.url);mkdirSync(dir,{recur
 // 4K normal maps can exceed 20 MB; keep the download bounded but large enough
 // for the high-resolution sand/dirt maps used by the runoff shoulders.
 const get=url=>execFileSync('curl',['-fLsS','--retry','2','--max-time','60',url],{maxBuffer:80*1024*1024});
-for(const [id,prefix,resolution] of [
+for(const [id,prefix,resolution,kinds] of [
   ['asphalt_02','asphalt','2k'],
   ['leafy_grass','grass','2k'],
   ['rock_boulder_cracked','rock','2k'],
   // Balanced quality uses lighter maps; High switches to the 4K versions below.
-  ['sandy_gravel_02','sand-2k','2k'],
-  ['dirt_aerial_02','dirt-2k','2k'],
+  ['sandy_gravel_02','sand-2k','2k',null],
+  ['dirt_aerial_02','dirt-2k','2k',null],
   // Higher-resolution runoff surfaces: the sand is visible beside the racing line,
   // while the dirt layer fills the wider graded shoulder beneath it.
-  ['sandy_gravel_02','sand','4k'],
-  ['dirt_aerial_02','dirt','4k'],
+  ['sandy_gravel_02','sand','4k',[['Diffuse','color']]],
+  ['dirt_aerial_02','dirt','4k',[['Diffuse','color']]],
 ]){
  const meta=JSON.parse(get('https://api.polyhaven.com/files/'+id));
- for(const [kind,suffix] of [['Diffuse','color'],['nor_gl','normal'],['Rough','rough']]){
+ for(const [kind,suffix] of (kinds||[['Diffuse','color'],['nor_gl','normal'],['Rough','rough']])){
   const entry=meta[kind]?.[resolution]?.jpg;if(!entry)throw Error(id+' missing '+kind+' at '+resolution);
   writeFileSync(new URL(prefix+'-'+suffix+'.jpg',dir),get(entry.url));
  }
