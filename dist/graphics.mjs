@@ -18,6 +18,10 @@ export function detailedWheel(side) {
  for(let i=0;i<10;i++){const a=i/10*Math.PI*2;const spoke=new T.Mesh(new T.BoxGeometry(.022,.19,.019),alloy);spoke.position.set(face,Math.cos(a)*.155,Math.sin(a)*.155);spoke.rotation.x=a;group.add(spoke);}
  const hub=new T.Mesh(new T.CylinderGeometry(.062,.062,.03,32),inner);hub.rotation.z=Math.PI/2;hub.position.x=face;group.add(hub);
  for(let i=0;i<5;i++){const a=i/5*Math.PI*2;const bolt=new T.Mesh(new T.SphereGeometry(.008,8,6),alloy);bolt.position.set(face+side*.018,Math.cos(a)*.042,Math.sin(a)*.042);group.add(bolt);}
+ // Batch static wheel parts by material instead of submitting every spoke/ring.
+ const batches=new Map();
+ for(const part of [...group.children]){if(!part.isMesh||part.isInstancedMesh)continue;part.updateMatrix();const geo=(part.geometry.index?part.geometry.toNonIndexed():part.geometry.clone()).applyMatrix4(part.matrix);if(!batches.has(part.material))batches.set(part.material,[]);batches.get(part.material).push(geo);group.remove(part);}
+ for(const [material,geometries] of batches){const merged=new T.BufferGeometry();for(const key of ['position','normal','uv']){const size=key==='uv'?2:3;const data=new Float32Array(geometries.reduce((sum,g)=>sum+g.attributes.position.count*size,0));let offset=0;for(const g of geometries){const a=g.attributes[key];if(a)data.set(a.array,offset);offset+=g.attributes.position.count*size;}merged.setAttribute(key,new T.BufferAttribute(data,size));}group.add(new T.Mesh(merged,material));geometries.forEach(g=>g.dispose());}
  group.traverse(o=>{if(o.isMesh)o.castShadow=o.receiveShadow=true;});return group;
 }
 
