@@ -9,8 +9,8 @@ for(const [id,prefix,resolution,kinds] of [
   ['leafy_grass','grass','2k'],
   ['rock_boulder_cracked','rock','2k'],
   // Balanced quality uses lighter maps; High switches to the 4K versions below.
-  ['sandy_gravel_02','sand-2k','2k',null],
-  ['dirt_aerial_02','dirt-2k','2k',null],
+  ['sandy_gravel_02','sand-2k','2k',[['Diffuse','color']]],
+  ['dirt_aerial_02','dirt-2k','2k',[['Diffuse','color']]],
   // Higher-resolution runoff surfaces: the sand is visible beside the racing line,
   // while the dirt layer fills the wider graded shoulder beneath it.
   ['sandy_gravel_02','sand','4k',[['Diffuse','color']]],
