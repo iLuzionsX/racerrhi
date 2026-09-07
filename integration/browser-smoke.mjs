@@ -208,6 +208,16 @@ const desktopCanvasAfterExit = await assertRenderableCanvas(desktopPage);
 await desktopPage.setViewportSize({width:1280,height:720});
 fs.mkdirSync('artifacts',{recursive:true});
 await desktopPage.screenshot({path:'artifacts/handling-preview.png'});
+const graphics = await desktopPage.evaluate(() => globalThis.__racerrhiGraphics);
+if (graphics) {
+ if (!(graphics.reflections > 1)) throw new Error('Circuit reflection probe did not update');
+ await desktopPage.evaluate(() => { const q=document.getElementById('quality');q.value='high';q.dispatchEvent(new Event('change',{bubbles:true})); });
+ await desktopPage.waitForFunction(before => globalThis.__racerrhiGraphics.reflections > before + 2, graphics.reflections);
+ await assertRenderableCanvas(desktopPage);
+ await desktopPage.screenshot({path:'artifacts/graphics-high.png'});
+ console.log('PASS animated circuit reflections and High quality rendering', graphics);
+}
+
 if (desktopErrors.length) throw new Error('desktop startup/session errors: ' + desktopErrors.join(' | '));
 await desktop.close();
 
