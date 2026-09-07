@@ -2,8 +2,8 @@ import {execFileSync} from 'node:child_process';
 import {writeFileSync, mkdirSync} from 'node:fs';
 const dir=new URL('./dist/assets/terrain/',import.meta.url);mkdirSync(dir,{recursive:true});
 // High mode intentionally spends bandwidth on the surfaces closest to the car.
-// 4K albedo + 2K normal/roughness gives runoff detail without shipping several
-// hundred MB of redundant 4K utility maps.
+// 4K albedo + already-cached 1K normal/roughness gives visible runoff detail
+// without a live quality switch decoding six large textures at once.
 const get=url=>execFileSync('curl',['-fLsS','--retry','2','--max-time','60',url],{maxBuffer:100*1024*1024});
 for(const [id,prefix,resolution,kinds] of [
   ['asphalt_02','asphalt','2k'],
@@ -12,9 +12,7 @@ for(const [id,prefix,resolution,kinds] of [
   ['sandy_gravel_02','sand-1k','1k'],
   ['dirt_aerial_02','dirt-1k','1k'],
   ['sandy_gravel_02','sand','4k',[['Diffuse','color']]],
-  ['sandy_gravel_02','sand','2k',[['nor_gl','normal'],['Rough','rough']]],
   ['dirt_aerial_02','dirt','4k',[['Diffuse','color']]],
-  ['dirt_aerial_02','dirt','2k',[['nor_gl','normal'],['Rough','rough']]],
 ]){
  const meta=JSON.parse(get('https://api.polyhaven.com/files/'+id));
  for(const [kind,suffix] of (kinds||[['Diffuse','color'],['nor_gl','normal'],['Rough','rough']])){

@@ -7,8 +7,10 @@ export async function surfaces(scene,renderer,materials,sky){
  const load=path=>{if(!cache.has(path))cache.set(path,loader.loadAsync(path));return cache.get(path);};
  const repeatFor=name=>name==='grass'?[155,155]:name==='rock'?[7,7]:name==='dirt'?[9,9]:name==='sand'?[12,12]:[1,1];
  const apply=async(name,material,quality)=>{
-  const runoff=name==='sand'||name==='dirt',prefix=runoff?(quality==='high'?name:`${name}-1k`):name;
-  const paths=['color','normal','rough'].map(kind=>`./assets/terrain/${prefix}-${kind}.jpg`);
+  const runoff=name==='sand'||name==='dirt',utilityPrefix=runoff?`${name}-1k`:name,colorPrefix=runoff&&quality==='high'?name:utilityPrefix;
+  // High upgrades only the albedo to 4K. Normal/roughness stay on the already
+  // decoded full-PBR utility maps so changing quality never recompiles six huge textures at once.
+  const paths=[`./assets/terrain/${colorPrefix}-color.jpg`,`./assets/terrain/${utilityPrefix}-normal.jpg`,`./assets/terrain/${utilityPrefix}-rough.jpg`];
   const maps=await Promise.all(paths.map(load));
   const repeat=repeatFor(name);
   maps.forEach((tx,i)=>{tx.wrapS=tx.wrapT=T.RepeatWrapping;tx.repeat.set(...repeat);tx.anisotropy=Math.min(maxAniso,quality==='high'?16:12);if(i===0)tx.colorSpace=T.SRGBColorSpace;});
@@ -27,6 +29,9 @@ export async function surfaces(scene,renderer,materials,sky){
   hdr.mapping=T.EquirectangularReflectionMapping;scene.environment=hdr;scene.environmentIntensity=1.28;
   scene.background=hdr;scene.backgroundIntensity=.92;scene.backgroundBlurriness=.018;scene.remove(sky);
  }catch(error){console.warn('HDR environment unavailable; keeping procedural sky.',error);}})();
+ // Warm the two 4K runoff albedos after startup. On a normal session they are
+ // decoded before the player ever visits Display settings, making High a cheap map swap.
+ setTimeout(()=>{for(const name of ['sand','dirt'])void load(`./assets/terrain/${name}-color.jpg`).catch(()=>{});},6500);
  return async quality=>{
   if(quality===loadedQuality)return;loadedQuality=quality;
   return Promise.all(['sand','dirt'].map(name=>apply(name,materials[name],quality)));
