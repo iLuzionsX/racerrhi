@@ -147,7 +147,8 @@ assert(assetSource.includes("'sand-1k','1k'")&&assetSource.includes("'dirt-1k','
 assert(visualsSource.includes("utilityPrefix=runoff?")&&visualsSource.includes("},6500);"));
 assert(gameSource.includes("if(runoffQualityReady)reloadSurfaceQuality(config.quality)")&&!gameSource.includes("config.quality==='balanced')reloadSurfaceQuality"));
 assert(gameSource.includes("trackDetailQuality(config.quality)")&&gameSource.includes("},1800);")&&gameSource.includes("buildRunoff();ribbon(0,15,roadMat)"));
-assert(graphicsSource.includes("high?160:64")&&graphicsSource.includes("high?.55:1.0")&&graphicsSource.includes("clearcoatRoughness:.032"));
+assert(graphicsSource.includes("high?128:64")&&graphicsSource.includes("high?.8:1.2")&&graphicsSource.includes("clearcoatRoughness:.032"));
+assert(gameSource.includes("mobile?1.5:1.65")&&gameSource.includes("mobile?1536:2048"));
 console.log('PASS high graphics path uses HDR reflections, full PBR runoff maps, live quality switching and roadside micro-detail');
 
 assert(indexSource.includes('CHALLENGE LAP')&&indexSource.includes('id="skill-hud"'));assert(gameSource.includes("awardDrivingSkill('apex','PERFECT APEX')")&&gameSource.includes("awardDrivingSkill('driftSave','DRIFT SAVED')")&&gameSource.includes("awardDrivingSkill('nearMiss','NEAR MISS')"));assert(gameSource.includes("session==='challenge'?'CHALLENGE LAP':'TIME ATTACK'"));console.log('PASS minimalist challenge-lap HUD and earned driving skill hooks');

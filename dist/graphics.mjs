@@ -87,14 +87,14 @@ export function localReflections(renderer,scene,car,materials){
  const floor=new T.Mesh(new T.PlaneGeometry(520,520),new T.MeshStandardMaterial({color:0x555a55,roughness:.9}));floor.rotation.x=-Math.PI/2;reflected.add(floor);
  function quality(value){
   high=value==='high';target?.dispose();
-  target=new T.WebGLCubeRenderTarget(high?160:64,{type:T.HalfFloatType,generateMipmaps:true,minFilter:T.LinearMipmapLinearFilter});
+  target=new T.WebGLCubeRenderTarget(high?128:64,{type:T.HalfFloatType,generateMipmaps:true,minFilter:T.LinearMipmapLinearFilter});
   probe=new T.CubeCamera(.35,320,target);
   materials.forEach(m=>{m.envMap=target.texture;m.envMapIntensity=Math.max(m.envMapIntensity||0,high?1.7:1.35);m.needsUpdate=true;});
   last=-Infinity;
  }
  quality('balanced');
  return {quality,update(time){
-  if(time-last<(high?.55:1.0))return;last=time;
+  if(time-last<(high?.8:1.2))return;last=time;
   probe.position.copy(car.position);probe.position.y+=1.05;floor.position.copy(car.position);floor.position.y-=.03;
   const radius=high?245:165,radius2=radius*radius;
   const world=new T.Vector3();for(const {proxy,source} of proxies){source.updateMatrixWorld();proxy.matrix.copy(source.matrixWorld);proxy.visible=source.getWorldPosition(world).distanceToSquared(car.position)<radius2;}
