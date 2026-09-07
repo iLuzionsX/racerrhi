@@ -136,3 +136,8 @@ controlled 120 km/h, 5% grade comparison, total tyre-load standard deviation dro
 from about 4.10 kN to 0.47 kN while mean support load stays within 0.1%. This fixes
 an integration disturbance rather than adding grip or changing suspension tuning.
 The sampled track geometry, material blending and pinned donor remain intact.
+
+
+## Console graphics preview
+
+`astra/console-graphics` combines the unmerged intuitive steering and reward loop branches; main is unchanged. Visual additions: 2K Poly Haven color/normal/roughness maps and HDR, circuit-local cubemap reflections (256px High / 128px Balanced), physical clearcoat paint and glass, 96-segment rounded tyres with tread, ten-spoke alloys, drilled discs and stationary calipers, tree trunks and denser trackside tyre geometry. High uses 4096px desktop / 2048px mobile shadows. The original compact M5 body and pinned donor physics are preserved; a full-detail body requires the original asset. Reflection captures hide the vehicle and reuse existing shadow maps. Existing quality settings control capture frequency and resolution.

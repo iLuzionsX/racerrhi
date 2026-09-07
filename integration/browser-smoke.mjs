@@ -50,7 +50,8 @@ if (process.env.RACERRHI_SMOKE_URL && !url.startsWith('https://')) {
 }
 
 const browser = await chromium.launch({
-  headless: false,
+  headless: process.env.RACERRHI_HEADLESS === '1',
+  executablePath: process.env.RACERRHI_CHROMIUM || undefined,
   args: [
     '--enable-webgl',
     '--ignore-gpu-blocklist',
