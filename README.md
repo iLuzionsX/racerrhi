@@ -28,7 +28,7 @@ Upload this repository to a new GitHub repository with default branch `main`. In
 
 - BMW M5 G90 exterior runtime and M5 physics donor: `iLuzionsX/Racing26`, pinned by the Pages build to commit `abff9f452e4c2b22ac1220a1414418ace3f36e0a`. BMW names/marks belong to their owners; no affiliation is claimed.
 - Three.js 0.180.0: MIT, included in `dist/assets/THREE-LICENSE.txt`.
-- Poly Haven CC0: Asphalt 02, Leafy Grass, Rock Boulder Cracked PBR maps and Grasslands Sunset HDR, downloaded at 1K. `download-assets.mjs` records reproducible source downloads. See https://polyhaven.com/license .
+- Poly Haven CC0: Asphalt 02, Leafy Grass, Rock Boulder Cracked PBR maps and Grasslands Sunset HDR at 2K; Sandy Gravel 02 and Dirt Aerial 02 PBR maps at 4K for the runoff shoulders. `download-assets-hq.mjs` records reproducible source downloads. See https://polyhaven.com/license .
 - Mediterranean stone-pine cutout generated for this project; crossed instanced foliage replaces the original cone trees. Detailed rock geometry, continuous safety fencing, tire barriers and pit lighting supplement the textured terrain.
 - Google Draco: Apache 2.0, included in `dist/assets/DRACO-LICENSE.txt`.
 - Barlow Condensed and Manrope fonts: SIL Open Font License, included in assets.

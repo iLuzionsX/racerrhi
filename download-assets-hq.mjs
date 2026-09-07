@@ -1,14 +1,24 @@
 import {execFileSync} from 'node:child_process';
 import {writeFileSync, mkdirSync} from 'node:fs';
 const dir=new URL('./dist/assets/terrain/',import.meta.url);mkdirSync(dir,{recursive:true});
-const get=url=>execFileSync('curl',['-fLsS','--retry','2','--max-time','60',url],{maxBuffer:20*1024*1024});
-for(const [id,prefix] of [['asphalt_02','asphalt'],['leafy_grass','grass'],['rock_boulder_cracked','rock']]){
+// 4K normal maps can exceed 20 MB; keep the download bounded but large enough
+// for the high-resolution sand/dirt maps used by the runoff shoulders.
+const get=url=>execFileSync('curl',['-fLsS','--retry','2','--max-time','60',url],{maxBuffer:80*1024*1024});
+for(const [id,prefix,resolution] of [
+  ['asphalt_02','asphalt','2k'],
+  ['leafy_grass','grass','2k'],
+  ['rock_boulder_cracked','rock','2k'],
+  // Higher-resolution runoff surfaces: the sand is visible beside the racing line,
+  // while the dirt layer fills the wider graded shoulder beneath it.
+  ['sandy_gravel_02','sand','4k'],
+  ['dirt_aerial_02','dirt','4k'],
+]){
  const meta=JSON.parse(get('https://api.polyhaven.com/files/'+id));
  for(const [kind,suffix] of [['Diffuse','color'],['nor_gl','normal'],['Rough','rough']]){
-  const entry=meta[kind]?.['2k']?.jpg;if(!entry)throw Error(id+' missing '+kind);
+  const entry=meta[kind]?.[resolution]?.jpg;if(!entry)throw Error(id+' missing '+kind+' at '+resolution);
   writeFileSync(new URL(prefix+'-'+suffix+'.jpg',dir),get(entry.url));
  }
- console.log('Downloaded',id);
+ console.log('Downloaded',id,resolution);
 }
 const hdr=JSON.parse(get('https://api.polyhaven.com/files/grasslands_sunset')).hdri['2k'].hdr;
 writeFileSync(new URL('sunset.hdr',dir),get(hdr.url));
