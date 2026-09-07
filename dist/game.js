@@ -100,8 +100,8 @@ let state=newCar(start.p.x,start.p.z,yaw),mode='intro',paused=false,cam=0,demoT=
 const keys=new Set();const resetLap=()=>({elapsed:0,next:1,previous:0,valid:true,count:1});lap=resetLap();const fmt=n=>{const m=Math.floor(n/60),s=Math.floor(n%60),ms=Math.floor(n%1*1000);return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(ms).padStart(3,'0')}`;};$('best').textContent=best?fmt(best):'—';
 function toast(s,kind=''){const el=$('toast');el.textContent=s;el.classList.toggle('skill-toast',kind==='skill');el.classList.add('visible');toastEnd=clock+3;}
 let session='attack',countdown=0;
-function beginLapReward(resetScore=false){if(resetScore)reward=createRewardState();challenge=session==='challenge'?chooseChallenge({hasGhost:Boolean(ghostTrace)}):null;ghostCapture=[{p:0,t:0}];lastGhostBin=0;apexSeen=new Set();driftTracker=null;nearMissTracker=null;driftCooldown=nearMissCooldown=0;renderRewardHud(0,true);}
-function reset(){state=newCar(start.p.x,start.p.z,yaw);lap=resetLap();keys.clear();clearInput();lastRoad=nearest(state.x,state.z);beginLapReward(true);resetM5StepScheduler(physicsClock);renderPrevious=captureM5RenderSnapshot(state);renderCurrent=renderPrevious;camera.position.copy(start.p).add(V(-5,5,-9));if(mode==='drive')toast(session==='challenge'?'Challenge armed. Drive clean.':'Fresh lap. Make it count.');}
+function beginLapReward(resetScore=false){if(resetScore)reward=createRewardState();challenge=session==='challenge'?chooseChallenge({hasGhost:Boolean(ghostTrace)}):null;ghostCapture=[{p:0,t:0}];lastGhostBin=0;apexSeen=new Set();driftTracker=null;nearMissTracker=null;driftCooldown=nearMissCooldown=0;renderRewardHud(0);}
+function reset(){state=newCar(start.p.x,start.p.z,yaw);lap=resetLap();keys.clear();clearInput();lastRoad=nearest(state.x,state.z);beginLapReward(true);resetM5StepScheduler(physicsClock);renderPrevious=captureM5RenderSnapshot(state);renderCurrent=renderPrevious;camera.position.copy(start.p).add(V(-5,5,-9));if(mode==='drive')toast(session==='challenge'&&challenge?'CHALLENGE · '+challenge.label:'Fresh lap. Make it count.');}
 function startMode(next){session=next;mode='drive';paused=false;cam=0;reset();countdown=3;$('intro').hidden=true;$('hud').hidden=false;document.body.classList.add('playing');$('mode').textContent=session==='practice'?'FREE PRACTICE':session==='challenge'?'CHALLENGE LAP':'TIME ATTACK';sessionVisible(true);updateCamLabel();if(config.sound)audioToggle();}
 function updateCamLabel(){$('camera-label').textContent=['CHASE','BONNET','CINEMA'][cam];}
 function quality(){renderer.setPixelRatio(Math.min(devicePixelRatio,config.quality==='high'?2:mobile?1.25:1.5));sunlight.shadow.mapSize.setScalar(config.quality==='high'?2048:1024);if(sunlight.shadow.map){sunlight.shadow.map.dispose();sunlight.shadow.map=null;}}
@@ -139,23 +139,22 @@ function updateSkillLoop(dt){
      }
    }
  }
- const nearZone=lap.valid&&speed>24&&!wall&&lastRoad.distance>12.0&&lastRoad.distance<14.35;
+ const nearZone=lap.valid&&speed>24&&!wall&&lastRoad.distance>7.1&&lastRoad.distance<8.9;
  if(nearMissCooldown<=0&&nearZone){
    if(!nearMissTracker)nearMissTracker={duration:0,maxDistance:lastRoad.distance};
    nearMissTracker.duration+=dt;nearMissTracker.maxDistance=Math.max(nearMissTracker.maxDistance,lastRoad.distance);
  }else if(nearMissTracker){
-   if(!wall&&lap.valid&&lastRoad.distance<11.5&&nearMissTracker.duration>=.16&&nearMissTracker.maxDistance>=13.0){awardDrivingSkill('nearMiss','NEAR MISS');nearMissCooldown=2;}
+   if(!wall&&lap.valid&&lastRoad.distance<6.5&&nearMissTracker.duration>=.16&&nearMissTracker.maxDistance>=8.3){awardDrivingSkill('nearMiss','NEAR MISS');nearMissCooldown=2;}
    nearMissTracker=null;
  }
 }
-function renderRewardHud(dt,force=false){
+function renderRewardHud(dt){
  const hud=$('skill-hud'),show=mode==='drive'&&session!=='practice';hud.hidden=!show;if(!show)return;
  $('skill-score').textContent=formatScore(rollDisplayScore(reward,dt));$('flow-mult').textContent='×'+reward.multiplier.toFixed(1);$('flow-fill').style.width=reward.flow.toFixed(1)+'%';
  const rule=$('challenge-rule');rule.hidden=session!=='challenge'||!challenge;
  if(!rule.hidden){$('challenge-name').textContent=challenge.label;$('challenge-detail').textContent=challenge.detail;}
  const ghostEl=$('ghost-delta'),ghostActive=session==='challenge'&&challenge?.id==='ghost-rival'&&ghostTrace;ghostEl.hidden=!ghostActive;
  if(ghostActive){const delta=ghostDelta(ghostTrace,lastRoad.t,lap.elapsed);$('ghost-delta-value').textContent=formatDelta(delta);ghostEl.classList.toggle('ahead',delta!==null&&delta<=0);ghostEl.classList.toggle('behind',delta!==null&&delta>0);}
- if(force&&session==='challenge'&&challenge)toast(`CHALLENGE · ${challenge.label}`);
 }
 const mapCtx=$('map').getContext('2d');function drawMap(t){mapCtx.clearRect(0,0,220,180);mapCtx.lineWidth=3;mapCtx.strokeStyle='#dbe5d36b';mapCtx.beginPath();samples.forEach((a,i)=>{const x=(a.p.x+320)*.22+20,y=(a.p.z+420)*.20+6;if(i)mapCtx.lineTo(x,y);else mapCtx.moveTo(x,y);});mapCtx.closePath();mapCtx.stroke();const p=at(t).p;mapCtx.fillStyle='#d5f96b';mapCtx.beginPath();mapCtx.arc((p.x+320)*.22+20,(p.z+420)*.20+6,4,0,TAU);mapCtx.fill();}
 let lastRoad=nearest(state.x,state.z),lastCameraTarget=V(),bonnetForward=V(Math.sin(state.heading),0,Math.cos(state.heading)),bonnetGrade=0,wheelSpin=0;
