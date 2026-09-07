@@ -32,7 +32,20 @@ export function upgradeCar(model){
 
 export function localReflections(renderer,scene,car,materials){
  let target,probe,last=-Infinity,high=true,captures=0;
- function quality(value){high=value==='high';target?.dispose();target=new T.WebGLCubeRenderTarget(high?256:128,{type:T.HalfFloatType,generateMipmaps:true,minFilter:T.LinearMipmapLinearFilter});probe=new T.CubeCamera(.5,650,target);materials.forEach(m=>{m.envMap=target.texture;m.needsUpdate=true;});last=-Infinity;}
+ // Capture nearby solid scenery, excluding distant forests and tiny furniture.
+ // The visible scene retains its full detail; the reflection scene shares geometry.
+ const reflected=new T.Scene();reflected.background=scene.background;
+ reflected.add(new T.HemisphereLight(0xdceeff,0x59684a,1.1));
+ const sun=new T.DirectionalLight(0xffdda1,3);sun.position.set(-78,35,-60);reflected.add(sun);
+ const proxies=[];scene.updateMatrixWorld(true);
+ for(const source of scene.children){
+  if(!source.isMesh||source.isInstancedMesh||source.material?.isShaderMaterial)continue;
+  source.geometry.computeBoundingSphere();const radius=source.geometry.boundingSphere.radius;
+  if(radius<1||radius>80)continue;
+  const proxy=new T.Mesh(source.geometry,source.material);proxy.matrixAutoUpdate=false;proxy.matrix.copy(source.matrixWorld);reflected.add(proxy);proxies.push({proxy,source});
+ }
+ const floor=new T.Mesh(new T.PlaneGeometry(400,400),new T.MeshStandardMaterial({color:0x555957,roughness:.95}));floor.rotation.x=-Math.PI/2;reflected.add(floor);
+ function quality(value){high=value==='high';target?.dispose();target=new T.WebGLCubeRenderTarget(high?128:64,{type:T.HalfFloatType,generateMipmaps:true,minFilter:T.LinearMipmapLinearFilter});probe=new T.CubeCamera(.5,250,target);materials.forEach(m=>{m.envMap=target.texture;m.needsUpdate=true;});last=-Infinity;}
  quality('high');
- return {quality,update(time){if(time-last<(high?.15:.45))return;last=time;probe.position.copy(car.position);probe.position.y+=1.15;const visible=car.visible,auto=renderer.shadowMap.autoUpdate;car.visible=false;renderer.shadowMap.autoUpdate=false;try{probe.update(renderer,scene);captures++;}finally{car.visible=visible;renderer.shadowMap.autoUpdate=auto;}},get captures(){return captures;}};
+ return {quality,update(time){if(time-last<(high?.3:1))return;last=time;probe.position.copy(car.position);probe.position.y+=1.15;floor.position.copy(car.position);floor.position.y-=.02;for(const {proxy,source} of proxies)proxy.visible=source.position.distanceToSquared(car.position)<180*180;probe.update(renderer,reflected);captures++;},get captures(){return captures;}};
 }
