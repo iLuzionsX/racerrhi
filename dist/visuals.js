@@ -1,20 +1,71 @@
 import * as T from 'three';
 import {RGBELoader} from './assets/RGBELoader.js';
+
 export async function surfaces(scene,renderer,materials,sky){
- const loader=new T.TextureLoader();
- const entries=Object.entries(materials);
+ const loader=new T.TextureLoader(),cache=new Map(),maxAniso=renderer.capabilities.getMaxAnisotropy();
  let loadedQuality='deferred';
- const apply=async(name,material,quality)=>{const pbr=name==='sand'||name==='dirt';const kinds=pbr?[['color','color']]:[['color','color'],['normal','normal'],['rough','rough']];const prefixFor=kind=>(pbr?(quality==='high'&&kind==='color'?name:`${name}-1k`):name);const maps=await Promise.all(kinds.map(([kind,suffix])=>loader.loadAsync(`./assets/terrain/${prefixFor(kind)}-${suffix}.jpg`)));maps.forEach((tx,i)=>{tx.wrapS=tx.wrapT=T.RepeatWrapping;tx.anisotropy=renderer.capabilities.getMaxAnisotropy();if(i===0)tx.colorSpace=T.SRGBColorSpace;if(name==='grass')tx.repeat.set(155,155);if(name==='dirt')tx.repeat.set(5,5);if(name==='sand')tx.repeat.set(7,7);});material.color.set('white');material.map=maps[0];material.normalMap=pbr?null:maps[1];material.roughnessMap=pbr?null:maps[2];material.normalScale.setScalar(name==='asphalt'?.55:name==='sand'?.7:.85);material.roughness=pbr?(name==='sand'?.86:.95):1;material.needsUpdate=true;};
- await Promise.all(entries.map(async([name,material])=>{if(name==='sand'||name==='dirt'){material.color.set(name==='sand'?'#b6a68a':'#75684e');material.roughness=name==='sand'?.86:.95;material.needsUpdate=true;return;}return apply(name,material,'normal');}));
- return async quality=>{if(quality===loadedQuality)return;loadedQuality=quality;return Promise.all(entries.filter(([name])=>name==='sand'||name==='dirt').map(([name,material])=>apply(name,material,quality)));};
- const hdr=await new RGBELoader().loadAsync('./assets/terrain/sunset.hdr');hdr.mapping=T.EquirectangularReflectionMapping;scene.environment=hdr;scene.environmentIntensity=1;scene.background=hdr;scene.backgroundIntensity=.8;scene.backgroundBlurriness=0;scene.remove(sky);
+ const load=path=>{if(!cache.has(path))cache.set(path,loader.loadAsync(path));return cache.get(path);};
+ const repeatFor=name=>name==='grass'?[155,155]:name==='rock'?[7,7]:name==='dirt'?[9,9]:name==='sand'?[12,12]:[1,1];
+ const apply=async(name,material,quality)=>{
+  const runoff=name==='sand'||name==='dirt',prefix=runoff?(quality==='high'?name:`${name}-1k`):name;
+  const paths=['color','normal','rough'].map(kind=>`./assets/terrain/${prefix}-${kind}.jpg`);
+  const maps=await Promise.all(paths.map(load));
+  const repeat=repeatFor(name);
+  maps.forEach((tx,i)=>{tx.wrapS=tx.wrapT=T.RepeatWrapping;tx.repeat.set(...repeat);tx.anisotropy=Math.min(maxAniso,quality==='high'?16:12);if(i===0)tx.colorSpace=T.SRGBColorSpace;});
+  material.color.set('white');material.map=maps[0];material.normalMap=maps[1];material.roughnessMap=maps[2];
+  material.normalScale.setScalar(name==='asphalt'?.62:name==='grass'?1.05:name==='rock'?1.1:name==='sand'?.72:.86);
+  material.roughness=name==='asphalt'?.9:name==='sand'?.93:name==='dirt'?.97:.98;
+  material.envMapIntensity=name==='asphalt'?.32:name==='rock'?.24:.12;material.needsUpdate=true;
+ };
+ // Load the core 2K scanned road/land surfaces before play starts.
+ await Promise.all(Object.entries(materials).filter(([name])=>name!=='sand'&&name!=='dirt').map(([name,material])=>apply(name,material,'high')));
+ // Balanced runoff still gets real normal + roughness data; High swaps in 4K albedo with 2K PBR detail.
+ await Promise.all(['sand','dirt'].map(name=>apply(name,materials[name],'balanced')));
+ try{
+  const hdr=await new RGBELoader().loadAsync('./assets/terrain/sunset.hdr');
+  hdr.mapping=T.EquirectangularReflectionMapping;scene.environment=hdr;scene.environmentIntensity=1.28;
+  scene.background=hdr;scene.backgroundIntensity=.92;scene.backgroundBlurriness=.018;scene.remove(sky);
+ }catch(error){console.warn('HDR environment unavailable; keeping procedural sky.',error);}
+ return async quality=>{
+  if(quality===loadedQuality)return;loadedQuality=quality;
+  return Promise.all(['sand','dirt'].map(name=>apply(name,materials[name],quality)));
+ };
 }
+
 export async function foliage(scene,positions){
- const bark=new T.MeshStandardMaterial({color:0x675b49,roughness:1});
- const trunks=new T.InstancedMesh(new T.CylinderGeometry(.09,.17,1,12),bark,positions.length),pose=new T.Object3D();
- positions.forEach((p,i)=>{pose.position.set(p.x,p.y+p.s*.55,p.z);pose.scale.set(p.s*.48,p.s*1.1,p.s*.48);pose.updateMatrix();trunks.setMatrixAt(i,pose.matrix);});trunks.castShadow=trunks.receiveShadow=true;scene.add(trunks);
-const tex=await new T.TextureLoader().loadAsync('./assets/terrain/stone-pine.png');tex.colorSpace=T.SRGBColorSpace;const material=new T.MeshStandardMaterial({map:tex,alphaTest:.48,side:T.DoubleSide,roughness:1});const geo=new T.PlaneGeometry(1,1);geo.translate(0,.5,0);const forest=new T.InstancedMesh(geo,material,positions.length*2),dummy=new T.Object3D();positions.forEach((p,i)=>{for(let k=0;k<2;k++){dummy.position.set(p.x,p.y,p.z);dummy.scale.setScalar(p.s*2.5);dummy.rotation.y=i*2.399+k*Math.PI/2;dummy.updateMatrix();forest.setMatrixAt(i*2+k,dummy.matrix);}});forest.castShadow=true;forest.receiveShadow=true;scene.add(forest);}
-export function furniture(scene,at,length){const steel=new T.MeshStandardMaterial({color:'#7e858a',roughness:.4,metalness:.8}),rubber=new T.MeshStandardMaterial({color:'#181b1e',roughness:.94});const dummy=new T.Object3D();const tires=new T.InstancedMesh(new T.TorusGeometry(.38,.17,16,48),rubber,360);for(let i=0;i<360;i++){const a=at(.27+Math.floor(i/3)*.00055);dummy.position.copy(a.p).addScaledVector(a.n,-14.5);dummy.position.y+=.22+(i%3)*.3;dummy.rotation.set(Math.PI/2,0,0);dummy.scale.setScalar(1);dummy.updateMatrix();tires.setMatrixAt(i,dummy.matrix);}tires.castShadow=tires.receiveShadow=true;scene.add(tires);
- const points=[];for(const side of [-1,1])for(let i=0;i<Math.floor(length/7);i++){const a=at(i/Math.floor(length/7)),b=at((i+1)/Math.floor(length/7));const p=a.p.clone().addScaledVector(a.n,side*17),q=b.p.clone().addScaledVector(b.n,side*17);points.push(p.clone().add(new T.Vector3(0,1,0)),p.clone().add(new T.Vector3(0,3.2,0)));for(const h of [1.3,1.8,2.3,2.8,3.2])points.push(p.clone().add(new T.Vector3(0,h,0)),q.clone().add(new T.Vector3(0,h,0)));}scene.add(new T.LineSegments(new T.BufferGeometry().setFromPoints(points),new T.LineBasicMaterial({color:'#6e7779',transparent:true,opacity:.5})));
- for(let i=0;i<14;i++){const a=at(i*.007),p=a.p.clone().addScaledVector(a.n,20);const pole=new T.Mesh(new T.CylinderGeometry(.09,.14,10,10),steel);pole.position.copy(p).y+=5;pole.castShadow=true;scene.add(pole);const lamp=new T.Mesh(new T.BoxGeometry(1.8,.18,.65),new T.MeshStandardMaterial({color:'#ededda',emissive:'#ffe4b0',emissiveIntensity:1.2}));lamp.position.copy(p).y+=10;scene.add(lamp);}
+ const bark=new T.MeshStandardMaterial({color:0x5f5342,roughness:1});
+ const trunks=new T.InstancedMesh(new T.CylinderGeometry(.09,.17,1,16),bark,positions.length),pose=new T.Object3D();
+ positions.forEach((p,i)=>{pose.position.set(p.x,p.y+p.s*.55,p.z);pose.scale.set(p.s*.48,p.s*1.1,p.s*.48);pose.rotation.y=(i*.73)%Math.PI;pose.updateMatrix();trunks.setMatrixAt(i,pose.matrix);});trunks.castShadow=trunks.receiveShadow=true;scene.add(trunks);
+ const tex=await new T.TextureLoader().loadAsync('./assets/terrain/stone-pine.png');tex.colorSpace=T.SRGBColorSpace;
+ const material=new T.MeshStandardMaterial({map:tex,alphaTest:.42,side:T.DoubleSide,roughness:.96,alphaToCoverage:true});
+ const geo=new T.PlaneGeometry(1,1);geo.translate(0,.5,0);
+ const forest=new T.InstancedMesh(geo,material,positions.length*3),dummy=new T.Object3D();
+ positions.forEach((p,i)=>{for(let k=0;k<3;k++){const idx=i*3+k,jitter=1+Math.sin(i*12.91+k*7.3)*.045;dummy.position.set(p.x,p.y,p.z);dummy.scale.set(p.s*2.45*jitter,p.s*2.65*jitter,p.s*2.45*jitter);dummy.rotation.y=i*2.399+k*Math.PI/3;dummy.updateMatrix();forest.setMatrixAt(idx,dummy.matrix);const tint=new T.Color().setHSL(.29+Math.sin(i*.91)*.012,.28,.48+Math.sin(i*1.71)*.035);forest.setColorAt(idx,tint);}});
+ forest.castShadow=true;forest.receiveShadow=true;scene.add(forest);
+}
+
+export function trackDetail(scene,at,length){
+ const makeLayer=(count,seed,color)=>{
+  let s=seed>>>0;const random=()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296;};
+  const geo=new T.IcosahedronGeometry(.12,1),mat=new T.MeshStandardMaterial({color,roughness:1,metalness:0});
+  const inst=new T.InstancedMesh(geo,mat,count),dummy=new T.Object3D();
+  for(let i=0;i<count;i++){
+   const t=(i/count+random()*.012)%1,a=at(t),side=random()<.5?-1:1,offset=side*(9.1+random()*12.5);
+   dummy.position.copy(a.p).addScaledVector(a.n,offset);dummy.position.y+=.01+random()*.10;
+   const scale=.45+random()*1.65;dummy.scale.set(scale*(.65+random()*.5),scale*.55,scale*(.75+random()*.55));dummy.rotation.set(random()*2,random()*Math.PI,random()*2);dummy.updateMatrix();inst.setMatrixAt(i,dummy.matrix);
+  }
+  inst.receiveShadow=true;scene.add(inst);return inst;
+ };
+ const near=makeLayer(Math.min(320,Math.floor(length*.27)),4151,0x817865);
+ const extra=makeLayer(Math.min(980,Math.floor(length*.82)),9917,0x706959);
+ extra.visible=false;
+ return quality=>{extra.visible=quality==='high';near.visible=true;};
+}
+
+export function furniture(scene,at,length){
+ const steel=new T.MeshStandardMaterial({color:'#7e858a',roughness:.32,metalness:.88,envMapIntensity:1.1}),rubber=new T.MeshStandardMaterial({color:'#151719',roughness:.94});
+ const dummy=new T.Object3D();const tires=new T.InstancedMesh(new T.TorusGeometry(.38,.17,18,56),rubber,360);
+ for(let i=0;i<360;i++){const a=at(.27+Math.floor(i/3)*.00055);dummy.position.copy(a.p).addScaledVector(a.n,-14.5);dummy.position.y+=.22+(i%3)*.3;dummy.rotation.set(Math.PI/2,0,0);dummy.scale.setScalar(1);dummy.updateMatrix();tires.setMatrixAt(i,dummy.matrix);}tires.castShadow=tires.receiveShadow=true;scene.add(tires);
+ const points=[];for(const side of [-1,1])for(let i=0;i<Math.floor(length/7);i++){const a=at(i/Math.floor(length/7)),b=at((i+1)/Math.floor(length/7));const p=a.p.clone().addScaledVector(a.n,side*17),q=b.p.clone().addScaledVector(b.n,side*17);points.push(p.clone().add(new T.Vector3(0,1,0)),p.clone().add(new T.Vector3(0,3.2,0)));for(const h of [1.3,1.8,2.3,2.8,3.2])points.push(p.clone().add(new T.Vector3(0,h,0)),q.clone().add(new T.Vector3(0,h,0)));}scene.add(new T.LineSegments(new T.BufferGeometry().setFromPoints(points),new T.LineBasicMaterial({color:'#7d8588',transparent:true,opacity:.56})));
+ for(let i=0;i<14;i++){const a=at(i*.007),p=a.p.clone().addScaledVector(a.n,20);const pole=new T.Mesh(new T.CylinderGeometry(.09,.14,10,12),steel);pole.position.copy(p).y+=5;pole.castShadow=true;scene.add(pole);const lamp=new T.Mesh(new T.BoxGeometry(1.8,.18,.65),new T.MeshStandardMaterial({color:'#ededda',emissive:'#ffe4b0',emissiveIntensity:1.35,roughness:.34}));lamp.position.copy(p).y+=10;scene.add(lamp);}
 }

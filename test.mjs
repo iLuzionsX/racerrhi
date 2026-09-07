@@ -100,9 +100,9 @@ const chassisCgDeclaration=gameSource.indexOf('const chassisCgLocalY=.52-.035'),
 const indexSource=fs.readFileSync(new URL('./dist/index.html',import.meta.url),'utf8');
 const uiSource=fs.readFileSync(new URL('./dist/ui.js',import.meta.url),'utf8');
 assert(gameSource.includes('w.rotation.y=ws.steerAngleRad;'));assert(!gameSource.includes('w.rotation.y=-steer;'));assert(gameSource.includes('wheelStateById.get(w.userData.id)'));console.log('PASS M5 render steering sign and wheel identity match vehicle physics');
-assert(indexSource.includes('maximum-scale=1,user-scalable=no'));assert(indexSource.includes('./ui.js?v=7')&&indexSource.includes('./game.js?v=15'));assert(uiSource.includes("document.addEventListener('touchend'")&&uiSource.includes("{passive:false}"));console.log('PASS Mobile Safari double-tap zoom suppression and cache-busted controls');
+assert(indexSource.includes('maximum-scale=1,user-scalable=no'));assert(indexSource.includes('./ui.js?v=7')&&indexSource.includes('./game.js?v=16'));assert(uiSource.includes("document.addEventListener('touchend'")&&uiSource.includes("{passive:false}"));console.log('PASS Mobile Safari double-tap zoom suppression and cache-busted controls');
 
-assert(uiSource.includes('input.held=false;input.steer=0'));assert(uiSource.includes("'gesturestart','gesturechange','gestureend'"));assert(uiSource.includes("e.touches.length>1")&&uiSource.includes("document.addEventListener('touchmove'"));assert(indexSource.includes('./ui.js?v=7')&&indexSource.includes('./game.js?v=15'));assert(gameSource.includes("./ui.js?v=7"));console.log('PASS Mobile Safari pinch zoom suppression and synchronized UI module cache bust');
+assert(uiSource.includes('input.held=false;input.steer=0'));assert(uiSource.includes("'gesturestart','gesturechange','gestureend'"));assert(uiSource.includes("e.touches.length>1")&&uiSource.includes("document.addEventListener('touchmove'"));assert(indexSource.includes('./ui.js?v=7')&&indexSource.includes('./game.js?v=16'));assert(gameSource.includes("./ui.js?v=7"));console.log('PASS Mobile Safari pinch zoom suppression and synchronized UI module cache bust');
 
 assert(gameSource.includes("d=a.d.clone().lerp(b.d,u).normalize()"));assert(gameSource.includes("n=a.n.clone().lerp(b.n,u).normalize()"));console.log('PASS Racerrhi road tangent/normal interpolation for M5 suspension continuity');
 
@@ -136,5 +136,17 @@ assert(gameSource.includes("bonnetProfile?bonnetProfile.targetFollowRate:6"));
 console.log('PASS bonnet camera filters heading, grade, position and look target with tight mount lag');
 
 assert(gameSource.includes('rebaseM5RenderSnapshotPose(renderState'));assert(gameSource.includes("./physics.mjs?v=4"));console.log('PASS intro and return-to-menu rebase world-space wheel hubs with staged chassis pose');
+
+const visualsSource=fs.readFileSync(new URL('./dist/visuals.js',import.meta.url),'utf8');
+const graphicsSource=fs.readFileSync(new URL('./dist/graphics.mjs',import.meta.url),'utf8');
+const assetSource=fs.readFileSync(new URL('./download-assets-hq.mjs',import.meta.url),'utf8');
+const hdrLoad=visualsSource.indexOf("const hdr=await new RGBELoader()"),qualityReturn=visualsSource.indexOf("return async quality=>");
+assert(hdrLoad>=0&&qualityReturn>hdrLoad,'HDR environment must load before the surface-quality callback returns');
+assert(visualsSource.includes("material.normalMap=maps[1]")&&visualsSource.includes("material.roughnessMap=maps[2]"));
+assert(assetSource.includes("'sand','2k',[['nor_gl','normal'],['Rough','rough']]")&&assetSource.includes("'dirt','2k',[['nor_gl','normal'],['Rough','rough']]"));
+assert(gameSource.includes("if(runoffQualityReady)reloadSurfaceQuality(config.quality)")&&!gameSource.includes("config.quality==='balanced')reloadSurfaceQuality");
+assert(gameSource.includes("trackDetailQuality(config.quality)")&&gameSource.includes("},250);"));
+assert(graphicsSource.includes("high?256:96")&&graphicsSource.includes("clearcoatRoughness:.032"));
+console.log('PASS high graphics path uses HDR reflections, full PBR runoff maps, live quality switching and roadside micro-detail');
 
 assert(indexSource.includes('CHALLENGE LAP')&&indexSource.includes('id="skill-hud"'));assert(gameSource.includes("awardDrivingSkill('apex','PERFECT APEX')")&&gameSource.includes("awardDrivingSkill('driftSave','DRIFT SAVED')")&&gameSource.includes("awardDrivingSkill('nearMiss','NEAR MISS')"));assert(gameSource.includes("session==='challenge'?'CHALLENGE LAP':'TIME ATTACK'"));console.log('PASS minimalist challenge-lap HUD and earned driving skill hooks');
