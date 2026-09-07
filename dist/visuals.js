@@ -19,13 +19,14 @@ export async function surfaces(scene,renderer,materials,sky){
  };
  // Load the core 2K scanned road/land surfaces before play starts.
  await Promise.all(Object.entries(materials).filter(([name])=>name!=='sand'&&name!=='dirt').map(([name,material])=>apply(name,material,'high')));
- // Balanced runoff still gets real normal + roughness data; High swaps in 4K albedo with 2K PBR detail.
- await Promise.all(['sand','dirt'].map(name=>apply(name,materials[name],'balanced')));
- try{
+ // Keep startup responsive: runoff begins with authored base color, then the
+ // full scanned PBR set is streamed in after the first rendered view.
+ for(const name of ['sand','dirt']){const material=materials[name];material.color.set(name==='sand'?'#b6a68a':'#75684e');material.roughness=name==='sand'?.93:.97;material.needsUpdate=true;}
+ void (async()=>{try{
   const hdr=await new RGBELoader().loadAsync('./assets/terrain/sunset.hdr');
   hdr.mapping=T.EquirectangularReflectionMapping;scene.environment=hdr;scene.environmentIntensity=1.28;
   scene.background=hdr;scene.backgroundIntensity=.92;scene.backgroundBlurriness=.018;scene.remove(sky);
- }catch(error){console.warn('HDR environment unavailable; keeping procedural sky.',error);}
+ }catch(error){console.warn('HDR environment unavailable; keeping procedural sky.',error);}})();
  return async quality=>{
   if(quality===loadedQuality)return;loadedQuality=quality;
   return Promise.all(['sand','dirt'].map(name=>apply(name,materials[name],quality)));

@@ -141,12 +141,12 @@ const visualsSource=fs.readFileSync(new URL('./dist/visuals.js',import.meta.url)
 const graphicsSource=fs.readFileSync(new URL('./dist/graphics.mjs',import.meta.url),'utf8');
 const assetSource=fs.readFileSync(new URL('./download-assets-hq.mjs',import.meta.url),'utf8');
 const hdrLoad=visualsSource.indexOf("const hdr=await new RGBELoader()"),qualityReturn=visualsSource.indexOf("return async quality=>");
-assert(hdrLoad>=0&&qualityReturn>hdrLoad,'HDR environment must load before the surface-quality callback returns');
-assert(visualsSource.includes("material.normalMap=maps[1]")&&visualsSource.includes("material.roughnessMap=maps[2]"));
+assert(hdrLoad>=0&&qualityReturn>hdrLoad,'HDR environment setup must remain reachable before the quality callback declaration');
+assert(visualsSource.includes("void (async()=>")&&visualsSource.includes("material.normalMap=maps[1]")&&visualsSource.includes("material.roughnessMap=maps[2]"));
 assert(assetSource.includes("'sand','2k',[['nor_gl','normal'],['Rough','rough']]")&&assetSource.includes("'dirt','2k',[['nor_gl','normal'],['Rough','rough']]"));
 assert(gameSource.includes("if(runoffQualityReady)reloadSurfaceQuality(config.quality)")&&!gameSource.includes("config.quality==='balanced')reloadSurfaceQuality"));
-assert(gameSource.includes("trackDetailQuality(config.quality)")&&gameSource.includes("},250);"));
-assert(graphicsSource.includes("high?256:96")&&graphicsSource.includes("clearcoatRoughness:.032"));
+assert(gameSource.includes("trackDetailQuality(config.quality)")&&gameSource.includes("},1800);")&&gameSource.includes("buildRunoff();ribbon(0,15,roadMat)"));
+assert(graphicsSource.includes("high?192:64")&&graphicsSource.includes("clearcoatRoughness:.032"));
 console.log('PASS high graphics path uses HDR reflections, full PBR runoff maps, live quality switching and roadside micro-detail');
 
 assert(indexSource.includes('CHALLENGE LAP')&&indexSource.includes('id="skill-hud"'));assert(gameSource.includes("awardDrivingSkill('apex','PERFECT APEX')")&&gameSource.includes("awardDrivingSkill('driftSave','DRIFT SAVED')")&&gameSource.includes("awardDrivingSkill('nearMiss','NEAR MISS')"));assert(gameSource.includes("session==='challenge'?'CHALLENGE LAP':'TIME ATTACK'"));console.log('PASS minimalist challenge-lap HUD and earned driving skill hooks');
