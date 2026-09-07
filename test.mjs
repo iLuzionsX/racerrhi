@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {sanitize,bounds,angleDelta,steerFromAngle,thumbSteer} from './dist/controls.mjs';
 import {chaseCameraProfile,estimatedSteadyStateLagM} from './dist/chase-camera.mjs';
 import {bonnetCameraProfile} from './dist/bonnet-camera.mjs';
+import {createRewardState,chooseChallenge,awardSkill,stepFlow,multiplierForFlow,ghostDelta,formatDelta} from './dist/reward-loop.mjs';
 for(const [w,h] of [[320,568],[390,844],[844,390],[1920,1080]])for(const x of [0,.5,1]){const c=sanitize({wheelSize:300,pedalSize:115,wheelX:x,wheelY:x,pedalX:x,pedalY:x});for(const r of [bounds(c,w,h).wheel,bounds(c,w,h).pedals]){assert(r.x>=0&&r.y>=0&&r.x+r.width<=w&&r.y+r.height<=h);}}
 for(const [w,h] of [[320,568],[390,844]]){const c=sanitize({});const b=bounds(c,w,h);assert(b.wheel.x+b.wheel.width<=b.pedals.x||b.pedals.x+b.pedals.width<=b.wheel.x);}
 assert.equal(sanitize(null).wheelSize,210);assert.equal(sanitize({wheelSize:999,quality:'invalid'}).wheelSize,300);assert.equal(sanitize({wheelX:NaN}).wheelX,.02);assert.equal(sanitize({pedalX:NaN}).pedalX,.98);assert(Math.abs(angleDelta(Math.PI-.1,-Math.PI+.1)-.2)<1e-10);assert.equal(steerFromAngle(Math.PI),1);assert.equal(steerFromAngle(-Math.PI),-1);console.log('PASS control bounds, saved-setting validation and steering wrap');
@@ -20,6 +21,17 @@ for(const width of [140,210,300])for(const sensitivity of [.6,1,1.5]){
   assert(thumbSteer(full,-stroke*.05,width,sensitivity)<.96,'overtravel delayed reversal');
 }
 console.log('PASS thumb travel, sensitivity, event-rate independence and immediate unwind');
+
+const reward=createRewardState();
+assert.equal(multiplierForFlow(0),1);assert.equal(multiplierForFlow(100),3);
+const baseSector=awardSkill(reward,'sector',null);assert(baseSector>=160);assert(reward.flow>0&&reward.score===baseSector);
+const doubleClean=chooseChallenge({hasGhost:false,random:()=>.9});assert.equal(doubleClean.id,'double-clean');
+const doubled=createRewardState();const doubledPoints=awardSkill(doubled,'sector',doubleClean);assert.equal(doubledPoints,320);
+for(let i=0;i<120;i++)stepFlow(doubled,{dt:1/120,cleanDriving:true});assert(doubled.flow>18,'clean driving should build flow');
+const broken=stepFlow(doubled,{dt:1/120,wallContact:true});assert.equal(broken.broken,true);assert.equal(doubled.flow,0);assert.equal(doubled.multiplier,1);
+const ghost=chooseChallenge({hasGhost:true,random:()=>.99});assert.equal(ghost.id,'ghost-rival');
+const trace=[{p:0,t:0},{p:.5,t:30},{p:1,t:60}];assert(Math.abs(ghostDelta(trace,.25,14)-(-1))<1e-9);assert.equal(formatDelta(-1),'−1.000');assert.equal(formatDelta(1),'+1.000');
+console.log('PASS minimalist skill score, flow break, challenge modifiers and ghost delta');
 
 
 import {newCar,stepCar,setCarPose,getM5PhysicsMetadata,advanceLap} from './dist/physics.mjs';
@@ -54,9 +66,9 @@ const chassisCgDeclaration=gameSource.indexOf('const chassisCgLocalY=.52-.035'),
 const indexSource=fs.readFileSync(new URL('./dist/index.html',import.meta.url),'utf8');
 const uiSource=fs.readFileSync(new URL('./dist/ui.js',import.meta.url),'utf8');
 assert(gameSource.includes('w.rotation.y=ws.steerAngleRad;'));assert(!gameSource.includes('w.rotation.y=-steer;'));assert(gameSource.includes('wheelStateById.get(w.userData.id)'));console.log('PASS M5 render steering sign and wheel identity match vehicle physics');
-assert(indexSource.includes('maximum-scale=1,user-scalable=no'));assert(indexSource.includes('./ui.js?v=5')&&indexSource.includes('./game.js?v=11'));assert(uiSource.includes("document.addEventListener('touchend'")&&uiSource.includes("{passive:false}"));console.log('PASS Mobile Safari double-tap zoom suppression and cache-busted controls');
+assert(indexSource.includes('maximum-scale=1,user-scalable=no'));assert(indexSource.includes('./ui.js?v=5')&&indexSource.includes('./game.js?v=12'));assert(uiSource.includes("document.addEventListener('touchend'")&&uiSource.includes("{passive:false}"));console.log('PASS Mobile Safari double-tap zoom suppression and cache-busted controls');
 
-assert(uiSource.includes("'gesturestart','gesturechange','gestureend'"));assert(uiSource.includes("e.touches.length>1")&&uiSource.includes("document.addEventListener('touchmove'"));assert(indexSource.includes('./ui.js?v=5')&&indexSource.includes('./game.js?v=11'));assert(gameSource.includes("./ui.js?v=5"));console.log('PASS Mobile Safari pinch zoom suppression and synchronized UI module cache bust');
+assert(uiSource.includes("'gesturestart','gesturechange','gestureend'"));assert(uiSource.includes("e.touches.length>1")&&uiSource.includes("document.addEventListener('touchmove'"));assert(indexSource.includes('./ui.js?v=5')&&indexSource.includes('./game.js?v=12'));assert(gameSource.includes("./ui.js?v=5"));console.log('PASS Mobile Safari pinch zoom suppression and synchronized UI module cache bust');
 
 assert(gameSource.includes("d=a.d.clone().lerp(b.d,u).normalize()"));assert(gameSource.includes("n=a.n.clone().lerp(b.n,u).normalize()"));console.log('PASS Racerrhi road tangent/normal interpolation for M5 suspension continuity');
 
@@ -90,3 +102,4 @@ assert(gameSource.includes("bonnetProfile?bonnetProfile.targetFollowRate:6"));
 console.log('PASS bonnet camera filters heading, grade, position and look target with tight mount lag');
 
 assert(gameSource.includes('rebaseM5RenderSnapshotPose(renderState'));assert(gameSource.includes("./physics.mjs?v=3"));console.log('PASS intro and return-to-menu rebase world-space wheel hubs with staged chassis pose');
+assert(indexSource.includes('CHALLENGE LAP')&&indexSource.includes('id="skill-hud"'));assert(gameSource.includes("awardDrivingSkill('apex','PERFECT APEX')")&&gameSource.includes("awardDrivingSkill('driftSave','DRIFT SAVED')")&&gameSource.includes("awardDrivingSkill('nearMiss','NEAR MISS')"));assert(gameSource.includes("session==='challenge'?'CHALLENGE LAP':'TIME ATTACK'"));console.log('PASS minimalist challenge-lap HUD and earned driving skill hooks');
