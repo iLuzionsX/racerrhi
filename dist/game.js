@@ -102,7 +102,7 @@ reflections=localReflections(renderer,scene,car,reflectiveMaterials);
 let state=newCar(start.p.x,start.p.z,yaw),mode='intro',paused=false,cam=0,demoT=.022,clock=0,prev=performance.now(),toastEnd=0,lap,best=0,reward=createRewardState(),challenge=null,ghostTrace=null,ghostCapture=[],lastGhostBin=0,apexSeen=new Set(),driftTracker=null,nearMissTracker=null,driftCooldown=0,nearMissCooldown=0;const physicsClock=createM5StepScheduler();let renderPrevious=captureM5RenderSnapshot(state),renderCurrent=renderPrevious;try{best=Number(localStorage.getItem('apex-best-v1'))||0;const savedGhost=JSON.parse(localStorage.getItem('apex-ghost-v1')||'null');if(Array.isArray(savedGhost)&&savedGhost.length>2)ghostTrace=savedGhost;else if(best>0)ghostTrace=[{p:0,t:0},{p:1,t:best}];}catch{}
 const keys=new Set();const resetLap=()=>({elapsed:0,next:1,previous:0,valid:true,count:1});lap=resetLap();const fmt=n=>{const m=Math.floor(n/60),s=Math.floor(n%60),ms=Math.floor(n%1*1000);return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(ms).padStart(3,'0')}`;};$('best').textContent=best?fmt(best):'—';
 function toast(s,kind=''){const el=$('toast');el.textContent=s;el.classList.toggle('skill-toast',kind==='skill');el.classList.add('visible');toastEnd=clock+3;}
-let session='attack',countdown=0;
+let session='attack',countdown=0;setInterval(()=>{if(mode==='drive'&&!paused&&countdown>0)countdown=Math.max(0,countdown-.05);},50);
 function beginLapReward(resetScore=false){if(resetScore)reward=createRewardState();challenge=session==='challenge'?chooseChallenge({hasGhost:Boolean(ghostTrace)}):null;ghostCapture=[{p:0,t:0}];lastGhostBin=0;apexSeen=new Set();driftTracker=null;nearMissTracker=null;driftCooldown=nearMissCooldown=0;renderRewardHud(0);}
 function reset(){state=newCar(start.p.x,start.p.z,yaw);lap=resetLap();keys.clear();clearInput();lastRoad=nearest(state.x,state.z);beginLapReward(true);resetM5StepScheduler(physicsClock);renderPrevious=captureM5RenderSnapshot(state);renderCurrent=renderPrevious;camera.position.copy(start.p).add(V(-5,5,-9));if(mode==='drive')toast(session==='challenge'&&challenge?'CHALLENGE · '+challenge.label:'Fresh lap. Make it count.');}
 function startMode(next){session=next;mode='drive';paused=false;cam=0;reset();countdown=3;$('intro').hidden=true;$('hud').hidden=false;document.body.classList.add('playing');$('mode').textContent=session==='practice'?'FREE PRACTICE':session==='challenge'?'CHALLENGE LAP':'TIME ATTACK';sessionVisible(true);updateCamLabel();if(config.sound)audioToggle();}
@@ -163,7 +163,7 @@ const mapCtx=$('map').getContext('2d');function drawMap(t){mapCtx.clearRect(0,0,
 let lastRoad=nearest(state.x,state.z),lastCameraTarget=V(),bonnetForward=V(Math.sin(state.heading),0,Math.cos(state.heading)),bonnetGrade=0,wheelSpin=0;
 function simulate(dt){
  if(mode==='drive'){
-  if(countdown>0){countdown=Math.max(0,countdown-dt);return;}
+  if(countdown>0)return;
   const keyLeft=keys.has('arrowleft')||keys.has('a'),keyRight=keys.has('arrowright')||keys.has('d');
   const digitalSteerDirection=keyLeft===keyRight?0:keyLeft?1:-1;
   const input={
