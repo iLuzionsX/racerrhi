@@ -4,6 +4,8 @@ import { Simulation } from '../.vendor/Racing26/src/physics/Simulation';
 import { DEFAULT_VEHICLE_CONFIG } from '../.vendor/Racing26/src/physics/vehiclePresets';
 import { racerrhiSurfaceMaterialForDistance } from './m5-surface-adapter';
 import { createRacerrhiM5Config } from './m5-config';
+import { nearestRoadProjection } from '../dist/road-projection.mjs';
+import { newCar, setCarPose, setSurfaceSampler, stepCar, M5_FIXED_DT } from './m5-bridge';
 
 const points = [
   [-225,13,-200],[-225,13,50],[-185,16,245],[-55,22,325],[100,27,265],[155,24,115],
@@ -264,3 +266,29 @@ console.log(JSON.stringify({
   },
   status:'passed'
 },null,2));
+
+// Reproduce the nearest-vertex/forward-only road-height staircase independently
+// of tyre coefficients. The corrected run uses the game's actual projection.
+function gradeLoadComparison(legacy: boolean) {
+  const gradeSamples = Array.from({length:501},(_,i)=>({p:{x:0,y:i*.1,z:i*2}}));
+  gradeSamples.push({p:{x:100,y:50,z:1000}},{p:{x:100,y:0,z:0}});
+  setSurfaceSampler((x,z)=>{
+    const {index,fraction}=nearestRoadProjection(gradeSamples,x,z);
+    const a=gradeSamples[index].p,b=gradeSamples[(index+1)%gradeSamples.length].p;
+    const elevation=legacy?Math.max(Math.round(z/2)*2,z)*.05:a.y+(b.y-a.y)*fraction;
+    return {p:{x,y:elevation,z},d:{x:0,y:.05,z:1},distance:0};
+  });
+  const state:any=newCar(0,100,0);setCarPose(state,0,100,0,120/3.6);
+  const loads:number[]=[];
+  for(let i=0;i<360;i++) {
+    stepCar(state,{digitalSteerDirection:0,throttle:.2},M5_FIXED_DT);
+    if(i>=120)loads.push(state.wheels.reduce((sum:number,w:any)=>sum+w.normalLoadN,0));
+  }
+  const meanN=loads.reduce((a,b)=>a+b,0)/loads.length;
+  const standardDeviationN=Math.sqrt(loads.reduce((a,b)=>a+(b-meanN)**2,0)/loads.length);
+  return {meanN,standardDeviationN,minN:Math.min(...loads),maxN:Math.max(...loads)};
+}
+const steppedGrade=gradeLoadComparison(true),continuousGrade=gradeLoadComparison(false);
+if(!(continuousGrade.standardDeviationN<steppedGrade.standardDeviationN*.25))throw new Error('road projection still creates artificial suspension load oscillation');
+if(!(Math.abs(continuousGrade.meanN/steppedGrade.meanN-1)<.05))throw new Error('road projection changed mean vehicle support load');
+console.log(JSON.stringify({scenario:'120 km/h, 5% grade: eliminate sampled road-height steps',steppedGrade,continuousGrade,status:'passed'},null,2));

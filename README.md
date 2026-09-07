@@ -126,3 +126,13 @@ Regression coverage includes settings bounds, response/strength independence,
 settings persistence into live physics, the faster default's 18 keyboard recovery
 cases, and mesh clearance on flat/uphill/downhill surfaces. The full donor,
 braking, load, recovery, handoff and browser suites remain deployment gates.
+
+## Continuous road support
+
+The nearest-road query now projects onto both adjacent segments of the nearest
+track vertex. The old forward-only choice made height jump halfway between
+vertices and could misread longitudinal separation as off-track distance. On a
+controlled 120 km/h, 5% grade comparison, total tyre-load standard deviation drops
+from about 4.10 kN to 0.47 kN while mean support load stays within 0.1%. This fixes
+an integration disturbance rather than adding grip or changing suspension tuning.
+The sampled track geometry, material blending and pinned donor remain intact.

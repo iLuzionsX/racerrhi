@@ -4,6 +4,21 @@ import {sanitize,bounds,angleDelta,steerFromAngle,thumbSteer} from './dist/contr
 import {chaseCameraProfile,estimatedSteadyStateLagM} from './dist/chase-camera.mjs';
 import {bonnetCameraProfile} from './dist/bonnet-camera.mjs';
 import {wheelVisualHubY} from './dist/wheel-contact.mjs';
+import {nearestRoadProjection} from './dist/road-projection.mjs';
+// Cross nearest-vertex boundaries on a grade. Height must follow the continuous
+// road plane and longitudinal progress must not become false lateral distance.
+const gradeSamples=[0,1,2,3,4,5].map(z=>({p:{x:0,y:z*.1,z}}));
+gradeSamples.push({p:{x:10,y:.5,z:5}},{p:{x:10,y:0,z:0}});
+for(let z=.3;z<4.7;z+=.013) {
+ const {index,fraction}=nearestRoadProjection(gradeSamples,.2,z);
+ const a=gradeSamples[index].p,b=gradeSamples[(index+1)%gradeSamples.length].p;
+ assert(Math.abs(a.y+(b.y-a.y)*fraction-z*.1)<1e-10,'road sampling introduced a height step');
+ assert(Math.abs(a.z+(b.z-a.z)*fraction-z)<1e-10,'road sampling introduced false off-track distance');
+}
+const seam=nearestRoadProjection(gradeSamples,4,0);
+assert.equal(seam.index,gradeSamples.length-1);
+assert(Math.abs(seam.fraction-.6)<1e-12,'closed track seam projected onto the wrong segment');
+console.log('PASS continuous road projection across vertex boundaries and lap seam');
 assert.equal(sanitize({}).keyboardResponse,1.25);
 assert.equal(sanitize({keyboardResponse:NaN,keyboardStrength:Infinity}).keyboardStrength,1);
 assert.equal(sanitize({keyboardResponse:99,keyboardStrength:-2}).keyboardResponse,1.8);
@@ -73,9 +88,9 @@ const chassisCgDeclaration=gameSource.indexOf('const chassisCgLocalY=.52-.035'),
 const indexSource=fs.readFileSync(new URL('./dist/index.html',import.meta.url),'utf8');
 const uiSource=fs.readFileSync(new URL('./dist/ui.js',import.meta.url),'utf8');
 assert(gameSource.includes('w.rotation.y=ws.steerAngleRad;'));assert(!gameSource.includes('w.rotation.y=-steer;'));assert(gameSource.includes('wheelStateById.get(w.userData.id)'));console.log('PASS M5 render steering sign and wheel identity match vehicle physics');
-assert(indexSource.includes('maximum-scale=1,user-scalable=no'));assert(indexSource.includes('./ui.js?v=7')&&indexSource.includes('./game.js?v=13'));assert(uiSource.includes("document.addEventListener('touchend'")&&uiSource.includes("{passive:false}"));console.log('PASS Mobile Safari double-tap zoom suppression and cache-busted controls');
+assert(indexSource.includes('maximum-scale=1,user-scalable=no'));assert(indexSource.includes('./ui.js?v=7')&&indexSource.includes('./game.js?v=14'));assert(uiSource.includes("document.addEventListener('touchend'")&&uiSource.includes("{passive:false}"));console.log('PASS Mobile Safari double-tap zoom suppression and cache-busted controls');
 
-assert(uiSource.includes('input.held=false;input.steer=0'));assert(uiSource.includes("'gesturestart','gesturechange','gestureend'"));assert(uiSource.includes("e.touches.length>1")&&uiSource.includes("document.addEventListener('touchmove'"));assert(indexSource.includes('./ui.js?v=7')&&indexSource.includes('./game.js?v=13'));assert(gameSource.includes("./ui.js?v=7"));console.log('PASS Mobile Safari pinch zoom suppression and synchronized UI module cache bust');
+assert(uiSource.includes('input.held=false;input.steer=0'));assert(uiSource.includes("'gesturestart','gesturechange','gestureend'"));assert(uiSource.includes("e.touches.length>1")&&uiSource.includes("document.addEventListener('touchmove'"));assert(indexSource.includes('./ui.js?v=7')&&indexSource.includes('./game.js?v=14'));assert(gameSource.includes("./ui.js?v=7"));console.log('PASS Mobile Safari pinch zoom suppression and synchronized UI module cache bust');
 
 assert(gameSource.includes("d=a.d.clone().lerp(b.d,u).normalize()"));assert(gameSource.includes("n=a.n.clone().lerp(b.n,u).normalize()"));console.log('PASS Racerrhi road tangent/normal interpolation for M5 suspension continuity');
 
