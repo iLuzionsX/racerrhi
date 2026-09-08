@@ -5,7 +5,7 @@ export async function surfaces(scene,renderer,materials,sky){
  const loader=new T.TextureLoader(),cache=new Map(),maxAniso=renderer.capabilities.getMaxAnisotropy();
  let loadedQuality='deferred';
  const load=path=>{if(!cache.has(path))cache.set(path,loader.loadAsync(path));return cache.get(path);};
- const repeatFor=name=>name==='grass'?[155,155]:name==='rock'?[7,7]:name==='dirt'?[9,9]:name==='sand'?[12,12]:[1,1];
+ const repeatFor=name=>name==='grass'?[155,155]:name==='rock'?[7,7]:name==='dirt'?[9,9]:name==='sand'?[12,12]:[3,3];
  const apply=async(name,material,quality)=>{
   const runoff=name==='sand'||name==='dirt',utilityPrefix=runoff?`${name}-1k`:name,colorPrefix=runoff&&quality==='high'?name:utilityPrefix;
   // High upgrades only the albedo to 4K. Normal/roughness stay on the already
@@ -15,7 +15,7 @@ export async function surfaces(scene,renderer,materials,sky){
   const repeat=repeatFor(name);
   maps.forEach((tx,i)=>{tx.wrapS=tx.wrapT=T.RepeatWrapping;tx.repeat.set(...repeat);tx.anisotropy=Math.min(maxAniso,quality==='high'?16:12);if(i===0)tx.colorSpace=T.SRGBColorSpace;});
   material.color.set('white');material.map=maps[0];material.normalMap=maps[1];material.roughnessMap=maps[2];
-  material.normalScale.setScalar(name==='asphalt'?.62:name==='grass'?1.05:name==='rock'?1.1:name==='sand'?.72:.86);
+  material.normalScale.setScalar(name==='asphalt'?.24:name==='grass'?1.05:name==='rock'?1.1:name==='sand'?.72:.86);
   material.roughness=name==='asphalt'?.9:name==='sand'?.93:name==='dirt'?.97:.98;
   material.envMapIntensity=name==='asphalt'?.32:name==='rock'?.24:.12;material.needsUpdate=true;
  };
@@ -26,8 +26,8 @@ export async function surfaces(scene,renderer,materials,sky){
  for(const name of ['sand','dirt']){const material=materials[name];material.color.set(name==='sand'?'#b6a68a':'#75684e');material.roughness=name==='sand'?.93:.97;material.needsUpdate=true;}
  void (async()=>{try{
   const hdr=await new RGBELoader().loadAsync('./assets/terrain/sunset.hdr');
-  hdr.mapping=T.EquirectangularReflectionMapping;scene.environment=hdr;scene.environmentIntensity=1.28;
-  scene.background=hdr;scene.backgroundIntensity=.92;scene.backgroundBlurriness=.018;scene.remove(sky);
+  hdr.mapping=T.EquirectangularReflectionMapping;scene.environment=hdr;scene.environmentIntensity=.9;
+  scene.background=hdr;scene.backgroundIntensity=.78;scene.backgroundBlurriness=.035;scene.remove(sky);
  }catch(error){console.warn('HDR environment unavailable; keeping procedural sky.',error);}})();
  // Warm the two 4K runoff albedos after startup. On a normal session they are
  // decoded before the player ever visits Display settings, making High a cheap map swap.
@@ -68,10 +68,10 @@ export function trackDetail(scene,at,length){
  return quality=>{extra.visible=quality==='high';near.visible=true;};
 }
 
-export function furniture(scene,at,length){
+export function furniture(scene,at,length,opening=()=>false){
  const steel=new T.MeshStandardMaterial({color:'#7e858a',roughness:.32,metalness:.88,envMapIntensity:1.1}),rubber=new T.MeshStandardMaterial({color:'#151719',roughness:.94});
  const dummy=new T.Object3D();const tires=new T.InstancedMesh(new T.TorusGeometry(.38,.17,18,56),rubber,360);
  for(let i=0;i<360;i++){const a=at(.27+Math.floor(i/3)*.00055);dummy.position.copy(a.p).addScaledVector(a.n,-14.5);dummy.position.y+=.22+(i%3)*.3;dummy.rotation.set(Math.PI/2,0,0);dummy.scale.setScalar(1);dummy.updateMatrix();tires.setMatrixAt(i,dummy.matrix);}tires.castShadow=tires.receiveShadow=true;scene.add(tires);
- const points=[];for(const side of [-1,1])for(let i=0;i<Math.floor(length/7);i++){const a=at(i/Math.floor(length/7)),b=at((i+1)/Math.floor(length/7));const p=a.p.clone().addScaledVector(a.n,side*17),q=b.p.clone().addScaledVector(b.n,side*17);points.push(p.clone().add(new T.Vector3(0,1,0)),p.clone().add(new T.Vector3(0,3.2,0)));for(const h of [1.3,1.8,2.3,2.8,3.2])points.push(p.clone().add(new T.Vector3(0,h,0)),q.clone().add(new T.Vector3(0,h,0)));}scene.add(new T.LineSegments(new T.BufferGeometry().setFromPoints(points),new T.LineBasicMaterial({color:'#7d8588',transparent:true,opacity:.56})));
+ const points=[];for(const side of [-1,1])for(let i=0;i<Math.floor(length/7);i++){const a=at(i/Math.floor(length/7)),b=at((i+1)/Math.floor(length/7));const p=a.p.clone().addScaledVector(a.n,side*17),q=b.p.clone().addScaledVector(b.n,side*17);if(opening(p.x,p.z)||opening(q.x,q.z))continue;points.push(p.clone().add(new T.Vector3(0,1,0)),p.clone().add(new T.Vector3(0,3.2,0)));for(const h of [1.3,1.8,2.3,2.8,3.2])points.push(p.clone().add(new T.Vector3(0,h,0)),q.clone().add(new T.Vector3(0,h,0)));}scene.add(new T.LineSegments(new T.BufferGeometry().setFromPoints(points),new T.LineBasicMaterial({color:'#7d8588',transparent:true,opacity:.56})));
  for(let i=0;i<14;i++){const a=at(i*.007),p=a.p.clone().addScaledVector(a.n,20);const pole=new T.Mesh(new T.CylinderGeometry(.09,.14,10,12),steel);pole.position.copy(p).y+=5;pole.castShadow=true;scene.add(pole);const lamp=new T.Mesh(new T.BoxGeometry(1.8,.18,.65),new T.MeshStandardMaterial({color:'#ededda',emissive:'#ffe4b0',emissiveIntensity:1.35,roughness:.34}));lamp.position.copy(p).y+=10;scene.add(lamp);}
 }

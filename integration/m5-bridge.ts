@@ -28,6 +28,8 @@ export type M5Vec3 = {
 };
 
 export type RoadSample = {
+  normal?: Partial<M5Vec3>;
+  material?: { type: 'asphalt' | 'kerb' | 'gravel'; friction: number; rollingResistance: number; isKerbRumble: boolean };
   p?: Partial<M5Vec3>;
   d?: Partial<M5Vec3>;
   distance?: number;
@@ -210,8 +212,13 @@ function surfaceFromRoad(x: number, z: number) {
   nz /= normalLength;
 
   const distance = finite(road.distance);
-  const material = racerrhiSurfaceMaterialForDistance(distance);
+  const material = road.material || racerrhiSurfaceMaterialForDistance(distance);
   const elevation = finite(road.p?.y);
+  if (road.normal) {
+    nx = finite(road.normal.x); ny = finite(road.normal.y, 1); nz = finite(road.normal.z);
+    const length = Math.hypot(nx, ny, nz) || 1;
+    nx /= length; ny /= length; nz /= length;
+  }
 
   return {
     elevation,

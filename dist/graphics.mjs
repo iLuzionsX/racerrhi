@@ -54,9 +54,10 @@ export function upgradeCar(model){
    const tag=((old.name||'')+' '+(o.name||'')).toLowerCase();
    let m=old;
    if(tag.includes('carpaint')||tag.includes('bodycolor')||tag.includes('body_color')){
-    m=makePhysical(old,{color:new T.Color(0x164d80),metalness:.72,roughness:.205,clearcoat:1,clearcoatRoughness:.032,envMapIntensity:1.7});
+    m=makePhysical(old,{color:new T.Color(0x164d80),metalness:.65,roughness:.24,clearcoat:1,clearcoatRoughness:.032,envMapIntensity:1.25});
    }else if(tag.includes('window')||tag.includes('glass_int')||tag.includes('windscreen')){
     m=makePhysical(old,{metalness:.10,roughness:.055,clearcoat:1,clearcoatRoughness:.025,envMapIntensity:1.1});
+    m.opacity=.55;
    }else if(tag.includes('chrome')||tag.includes('mirror')||tag.includes('trim')){
     m=old.clone();m.metalness=1;m.roughness=Math.min(.10,m.roughness??.1);m.envMapIntensity=1.65;
    }else if(old.isMeshStandardMaterial||old.isMeshPhysicalMaterial){
@@ -79,17 +80,18 @@ export function localReflections(renderer,scene,car,materials){
  const sun=new T.DirectionalLight(0xffdda1,3.4);sun.position.set(-78,35,-60);reflected.add(sun);
  const proxies=[];scene.updateMatrixWorld(true);
  for(const source of scene.children){
-  if(!source.isMesh||source.isInstancedMesh||source.material?.isShaderMaterial)continue;
+  if(!source.isMesh||source.material?.isShaderMaterial||source.material?.transparent||source.material?.alphaTest>0)continue;
+  if(source.isInstancedMesh&&source.count>240)continue;
   source.geometry.computeBoundingSphere();const radius=source.geometry.boundingSphere.radius;
   if(radius<.8||radius>140)continue;
-  const proxy=new T.Mesh(source.geometry,source.material);proxy.matrixAutoUpdate=false;proxy.matrix.copy(source.matrixWorld);reflected.add(proxy);proxies.push({proxy,source});
+  const proxy=source.isInstancedMesh?source.clone():new T.Mesh(source.geometry,source.material);proxy.matrixAutoUpdate=false;proxy.matrix.copy(source.matrixWorld);reflected.add(proxy);proxies.push({proxy,source});
  }
  const floor=new T.Mesh(new T.PlaneGeometry(520,520),new T.MeshStandardMaterial({color:0x555a55,roughness:.9}));floor.rotation.x=-Math.PI/2;reflected.add(floor);
  function quality(value){
   high=value==='high';target?.dispose();
   target=new T.WebGLCubeRenderTarget(high?128:64,{type:T.HalfFloatType,generateMipmaps:true,minFilter:T.LinearMipmapLinearFilter});
   probe=new T.CubeCamera(.35,320,target);
-  materials.forEach(m=>{m.envMap=target.texture;m.envMapIntensity=Math.max(m.envMapIntensity||0,high?1.7:1.35);m.needsUpdate=true;});
+  materials.forEach(m=>{m.userData.reflectionStrength??=m.envMapIntensity||1;m.envMap=target.texture;m.envMapIntensity=m.userData.reflectionStrength*(high?1:.85);m.needsUpdate=true;});
   last=-Infinity;
  }
  quality('balanced');
@@ -97,7 +99,7 @@ export function localReflections(renderer,scene,car,materials){
   if(time-last<(high?.8:1.2))return;last=time;
   probe.position.copy(car.position);probe.position.y+=1.05;floor.position.copy(car.position);floor.position.y-=.03;
   const radius=high?245:165,radius2=radius*radius;
-  const world=new T.Vector3();for(const {proxy,source} of proxies){source.updateMatrixWorld();proxy.matrix.copy(source.matrixWorld);proxy.visible=source.getWorldPosition(world).distanceToSquared(car.position)<radius2;}
+  const world=new T.Vector3();for(const {proxy,source} of proxies){source.updateMatrixWorld();proxy.matrix.copy(source.matrixWorld);if(source.isInstancedMesh){source.computeBoundingSphere();world.copy(source.boundingSphere.center).applyMatrix4(source.matrixWorld);proxy.visible=world.distanceToSquared(car.position)<(radius+source.boundingSphere.radius)**2;}else proxy.visible=source.getWorldPosition(world).distanceToSquared(car.position)<radius2;}
   reflected.background=scene.background;reflected.environment=scene.environment;
   probe.update(renderer,reflected);captures++;
  },get captures(){return captures;}};

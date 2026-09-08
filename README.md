@@ -141,6 +141,14 @@ The sampled track geometry, material blending and pinned donor remain intact.
 
 ## Console graphics preview
 
+### Connected hill rally route
+
+`astra/rally-realism` builds on the G90 and keyboard-handling preview. Turn right through the signed opening just beyond start/finish, before the pit garages. The access lane joins a roughly 985 m dirt loop with approximately 33 m of elevation range and an 11.4% maximum sampled grade. The main circuit geometry and pinned donor are unchanged. The rally surface supplies its own height, normal, gravel friction (0.62), and rolling resistance (0.045); going onto it invalidates a paved timed lap. Free Practice is recommended. Orange lines on the minimap show the access and loop.
+
+The scenery pass adds graded hills, instanced scrub, stones and route posts, pit facade/shutter detail, vegetation ground shading, world-space asphalt variation, finer asphalt texture scale, toned-down mountain colors and material-calibrated reflections. Existing licensed Poly Haven textures are reused; no additional third-party asset license is introduced. Balanced uses half the extra scrub/stone instances.
+
+`integration/rally-route-regression.test.ts` checks route clearance, grades, entrance height continuity, original asphalt sampling, chassis support on twelve grades, and a headless look-ahead drive around the loop. `integration/rally-visual-review.mjs` runs only in CI, injecting a non-shipped camera hook into an isolated server for matched close/chase/trackside/rally screenshots and software-renderer timing against pre-rally commit `b41bcac6839060bb2cd724a1f0f3646dd786bf4b`.
+
 ### Full-detail G90 replacement
 
 `astra/next-gen-g90` replaces the untextured LOD-C body with the downloaded full-detail G90, including interior, lamps, badges, grille textures, wheel meshes and separate brake calipers. About 320k triangles remain after removing the closed-hood engine; Draco and WebP reduce the 29MB original to 2.5MB. No mesh simplification is applied. Geometry is batched into nine physics-aligned assemblies. Mis-parented rear rim components in the source are reassigned by position. The fixed-step donor physics, track, steering, UI and cameras are unchanged.

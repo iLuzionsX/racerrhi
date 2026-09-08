@@ -10,6 +10,6 @@ export function wheelVisualHubY(physicalY, road, heading, radius=.369, width=.28
   // Exact cylinder support along the road normal, including its finite width.
   const support=radius*Math.sqrt(Math.max(0,1-axisDot*axisDot))+width*.5*Math.abs(axisDot);
   const distance=Math.abs(road.distance||0);
-  const surfaceOffset=Math.abs(distance-7.19)<.065?.06:distance>=7.25&&distance<=8.15?.045:distance<=7.5?.02:-.09;
+  const surfaceOffset=road.surfaceOffset??(Math.abs(distance-7.19)<.065?.06:distance>=7.25&&distance<=8.15?.045:distance<=7.5?.02:-.09);
   return Math.max(physicalY,road.p.y+surfaceOffset+support/Math.max(.1,ny));
 }
