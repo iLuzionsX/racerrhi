@@ -22,7 +22,7 @@ export function environmentPass(scene,at,ground,route,trees,roadMaterial){
  // Small Mediterranean scrub clusters; route shoulders stay clear.
  const bushes=new T.InstancedMesh(new T.IcosahedronGeometry(1,2),new T.MeshStandardMaterial({color:0xffffff,roughness:1}),720);
  for(let i=0;i<720;i++){
-  const a=route.paths[1].samples[Math.floor(i/720*(route.paths[1].samples.length-1))],offset=(i%2?1:-1)*(10+5*(.5+.5*Math.sin(i*81.73))),p=a.p.clone().addScaledVector(a.n,offset);
+  const a=route.paths[1].samples[Math.floor(((i*317)%720)/720*(route.paths[1].samples.length-1))],offset=(i%2?1:-1)*(11+37*(.5+.5*Math.sin(i*81.73))),p=a.p.clone().addScaledVector(a.n,offset);
   const size=.4+(.5+.5*Math.sin(i*42.61))*1.1;pose.position.set(p.x,ground(p.x,p.z)+size*.55,p.z);pose.rotation.set(i*.31,i*2.399,i*.47);pose.scale.set(size,size*.65,size);pose.updateMatrix();bushes.setMatrixAt(i,pose.matrix);bushes.setColorAt(i,new T.Color().setHSL(.20+Math.sin(i)*.025,.20,.21+.07*(.5+.5*Math.sin(i*3.17))));
  }
  bushes.castShadow=bushes.receiveShadow=true;scene.add(bushes);
@@ -30,5 +30,5 @@ export function environmentPass(scene,at,ground,route,trees,roadMaterial){
  const canvas=document.createElement('canvas');canvas.width=canvas.height=64;const ctx=canvas.getContext('2d'),g=ctx.createRadialGradient(32,32,2,32,32,32);g.addColorStop(0,'rgba(15,22,12,.30)');g.addColorStop(1,'rgba(15,22,12,0)');ctx.fillStyle=g;ctx.fillRect(0,0,64,64);
  const shade=new T.InstancedMesh(new T.PlaneGeometry(1,1),new T.MeshBasicMaterial({map:new T.CanvasTexture(canvas),transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1}),trees.length);
  trees.forEach((p,i)=>{pose.position.set(p.x,p.y+.04,p.z);pose.rotation.set(-Math.PI/2,0,0);pose.scale.set(p.s*1.5,p.s*1.5,1);pose.updateMatrix();shade.setMatrixAt(i,pose.matrix);});scene.add(shade);
- return value=>{bushes.count=value==='high'?720:360;};
+ return value=>{bushes.count=value==='high'?360:180;};
 }

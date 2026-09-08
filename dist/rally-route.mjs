@@ -45,13 +45,14 @@ export function buildRallyVisuals(scene,route,renderer){
  const loader=new T.TextureLoader(),soil=new T.MeshStandardMaterial({color:0xa18a63,roughness:1,envMapIntensity:.2});
  const ready=Promise.all(['color','normal','rough'].map(kind=>loader.loadAsync('./assets/terrain/dirt-1k-'+kind+'.jpg'))).then(maps=>{
   maps.forEach((tx,i)=>{tx.wrapS=tx.wrapT=T.RepeatWrapping;tx.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());if(i===0)tx.colorSpace=T.SRGBColorSpace;});
-  [soil.map,soil.normalMap,soil.roughnessMap]=maps;soil.normalScale.set(.32,.32);soil.needsUpdate=true;
+  [soil.map,soil.normalMap,soil.roughnessMap]=maps;soil.normalScale.set(.12,.12);soil.needsUpdate=true;
  });
- const shoulder=new T.MeshStandardMaterial({color:0x80734f,roughness:1,vertexColors:true});
+ const edgeCanvas=document.createElement('canvas');edgeCanvas.width=64;edgeCanvas.height=2;const edgeContext=edgeCanvas.getContext('2d'),fade=edgeContext.createLinearGradient(0,0,64,0);fade.addColorStop(0,'black');fade.addColorStop(.25,'white');fade.addColorStop(.75,'white');fade.addColorStop(1,'black');edgeContext.fillStyle=fade;edgeContext.fillRect(0,0,64,2);
+ const shoulder=new T.MeshStandardMaterial({color:0x80734f,roughness:1,vertexColors:true,alphaMap:new T.CanvasTexture(edgeCanvas),transparent:true,depthWrite:false});
  function strip(path,width,offset,material,lift,edge=false){
   const positions=[],uv=[],colors=[],indices=[];
   path.samples.forEach((a,i)=>{
-   for(const side of [-1,1]){const p=a.p.clone().addScaledVector(a.n,offset+side*width/2);positions.push(p.x,p.y+lift,p.z);uv.push((offset+side*width/2)/3,i*path.length/(path.samples.length-1)/3);const c=new T.Color().setHSL(.12,.19,.31+.045*Math.sin(i*.08));colors.push(c.r,c.g,c.b);}
+   for(const side of [-1,1]){const irregular=width>7?.24*Math.sin(i*.31+side)+.14*Math.sin(i*.83):0,p=a.p.clone().addScaledVector(a.n,offset+side*(width/2+irregular));positions.push(p.x,p.y+lift,p.z);uv.push(edge?(side+1)/2:(offset+side*width/2)/1.2,edge?.5:i*path.length/(path.samples.length-1)/1.2);const c=new T.Color().setHSL(.12,.19,.31+.045*Math.sin(i*.08));colors.push(c.r,c.g,c.b);}
    if(i<path.samples.length-1){const j=i*2;indices.push(j,j+2,j+1,j+1,j+2,j+3);}
   });
   const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(positions,3));g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));if(edge)g.setAttribute('color',new T.Float32BufferAttribute(colors,3));g.setIndex(indices);g.computeVertexNormals();const m=new T.Mesh(g,material);m.receiveShadow=true;scene.add(m);
@@ -62,5 +63,7 @@ export function buildRallyVisuals(scene,route,renderer){
  for(let i=0;i<560;i++){const path=route.paths[1],a=path.samples[Math.floor(i/560*(path.samples.length-1))],side=i%2?1:-1;pose.position.copy(a.p).addScaledVector(a.n,side*(5.1+(Math.sin(i*83.13)*.5+.5)*4));pose.position.y+=.07;const s=.1+(Math.sin(i*3.3)*.5+.5)*.35;pose.scale.set(s*1.4,s*.65,s);pose.rotation.set(i*.3,i*2.39,i*.7);pose.updateMatrix();stones.setMatrixAt(i,pose.matrix);}
  for(let i=0;i<220;i++){const path=route.paths[1],a=path.samples[Math.floor(i/220*(path.samples.length-1))];pose.position.copy(a.p).addScaledVector(a.n,(i%2?1:-1)*6);pose.position.y+=.4;pose.scale.set(1,1,1);pose.rotation.set(0,i,0);pose.updateMatrix();posts.setMatrixAt(i,pose.matrix);}
  stones.receiveShadow=true;posts.castShadow=posts.receiveShadow=true;scene.add(stones,posts);
- return {ready,quality(value){stones.count=value==='high'?560:280;}};
+ // Keep scattered stones sparse, rather than a visually continuous stone border.
+ for(let i=0;i<180;i++){const source=(i*173)%560,matrix=new T.Matrix4();stones.getMatrixAt(source,matrix);stones.setMatrixAt(i,matrix);}stones.count=180;
+ return {ready,quality(value){stones.count=value==='high'?180:90;}};
 }
