@@ -80,7 +80,9 @@ async function assertRenderableCanvas(page) {
     throw new Error('WebGL canvas did not occupy the CI playability viewport');
   }
 
-  const pngBuffer = await canvas.screenshot();
+  // Adaptive resolution can change canvas backing dimensions while it renders.
+  // Capture its visible bounds without an element-stability wait.
+  const pngBuffer = await page.screenshot({ clip: box });
   const png = PNG.sync.read(pngBuffer);
   let sum = 0;
   let sumSq = 0;
