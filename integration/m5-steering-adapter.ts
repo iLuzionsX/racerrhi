@@ -2,6 +2,7 @@ import { Simulation } from '../.vendor/Racing26/src/physics/Simulation';
 import { PhysicsMath } from '../.vendor/Racing26/src/physics/math/PhysicsMath';
 import {
   digitalCountersteerRecoveryBlend,
+  digitalSteeringLimitForSpeed,
   digitalSteeringTarget,
 } from '../.vendor/Racing26/src/physics/DigitalSteeringInput';
 
@@ -100,8 +101,16 @@ export function updateRacerrhiKeyboardSteeringInput(
   if (!(dt > 0)) return current;
 
   const { speedMs, context } = steeringContext(sim, tuning);
-  const ordinaryWindTime = 0.58 / tuningValue(tuning.keyboardResponse, 0.70, 1.80);
+  // Preserve the validated catch timing when steering against an existing slide.
+  const correctingSlide = direction * context.yawRateRadS < 0
+    && direction * context.sideslipRad > 0;
+  const ordinaryWindTime = (correctingSlide ? 0.58 : 0.38) / tuningValue(tuning.keyboardResponse, 0.70, 1.80);
   const target = digitalSteeringTarget(direction, speedMs, context);
+  const ordinaryLimit = digitalSteeringLimitForSpeed(speedMs, context);
+  // Ordinary release takes ~100ms across speeds. Large recovery lock retains
+  // the proven rapid unwind rather than trapping the driver in countersteer.
+  const unwindRate = Math.abs(current) > ordinaryLimit * 1.05 || Math.abs(context.sideslipRad) > 0.02
+    ? 6.0 : ordinaryLimit / 0.10;
   const recoveryBlend = digitalCountersteerRecoveryBlend(
     direction,
     speedMs,
@@ -118,7 +127,6 @@ export function updateRacerrhiKeyboardSteeringInput(
   // Reversal is explicitly two-stage: unwind first, then build the opposite
   // request. This prevents one fast slew step from blasting through center.
   if (reversing) {
-    const unwindRate = 6.0;
     const timeToCenter = Math.abs(current) / unwindRate;
     if (dt <= timeToCenter) {
       return moveToward(current, 0, unwindRate * dt);
@@ -132,9 +140,8 @@ export function updateRacerrhiKeyboardSteeringInput(
   }
 
   if (direction === 0) {
-    // Quick, smooth release with no exponential tail. Six rack-fractions per
-    // second returns even full lock in about 0.17 s at the fixed 120 Hz cadence.
-    return moveToward(current, 0, 6.0 * dt);
+    // Finite release without a speed-dependent one-step snap to center.
+    return moveToward(current, 0, unwindRate * dt);
   }
 
   // If acceleration or another state change lowers the useful envelope while a
@@ -146,7 +153,7 @@ export function updateRacerrhiKeyboardSteeringInput(
     return moveToward(current, target, 4.0 * dt);
   }
 
-  // Normal wind-on takes ~0.58 s from center to the current ordinary limit,
+  // Normal wind-on takes ~0.38 s from center to the current ordinary limit,
   // independent of whether that limit is 100% rack at parking speed or only a
   // few percent at 200 km/h. Severe recovery smoothly shortens that to 0.12 s,
   // close to the donor's full-recovery slew, without a target or rate jump.

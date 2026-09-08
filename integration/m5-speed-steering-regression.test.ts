@@ -134,11 +134,11 @@ for (const speed of [0, 50, 80, 120, 150, 200]) {
   const left = keyboardWindTime(speed, 1);
   const right = keyboardWindTime(speed, -1);
   assert(Math.abs(left.target + right.target) < 1e-12, 'keyboard target lost symmetry');
-  assert(left.seconds >= 0.55 && left.seconds <= 0.61, 'keyboard wind-on time drifted: ' + JSON.stringify({ speed, left }));
+  assert(left.seconds >= 0.37 && left.seconds <= 0.40, 'keyboard wind-on time drifted: ' + JSON.stringify({ speed, left }));
   assert(Math.abs(left.seconds - right.seconds) <= M5_FIXED_DT, 'keyboard timing lost direction symmetry');
 
   const tap = keyboardTapFraction(speed, 1);
-  assert(tap.fraction > 0.15 && tap.fraction < 0.20, 'short key tap is not repeatable across speed: ' + JSON.stringify({ speed, tap }));
+  assert(tap.fraction > 0.25 && tap.fraction < 0.28, 'short key tap is not repeatable across speed: ' + JSON.stringify({ speed, tap }));
 
   // Release should be much faster than wind-on.
   setLocalMotion(sim, speed, 0, 0);
@@ -148,7 +148,7 @@ for (const speed of [0, 50, 80, 120, 150, 200]) {
     setLocalMotion(sim, speed, 0, 0);
     released = updateRacerrhiKeyboardSteeringInput(sim, released, 0, M5_FIXED_DT);
   }
-  assert(releaseSteps * M5_FIXED_DT < 0.25, 'keyboard release is too slow');
+  assert(releaseSteps * M5_FIXED_DT >= 0.09 && releaseSteps * M5_FIXED_DT <= 0.12, 'ordinary release must be progressive and consistent across speeds');
 
   // Opposite input must unwind immediately, cross center quickly, then ramp the
   // other direction rather than teleporting through center.
@@ -187,7 +187,7 @@ for (const speed of [0, 50, 80, 120, 150, 200]) {
         current=updateRacerrhiKeyboardSteeringInput(sim,current,sign,M5_FIXED_DT,tuning);
         ticks++;
       }
-      assert(Math.abs(ticks*M5_FIXED_DT-.58/response)<=M5_FIXED_DT+1e-9, 'keyboard setting changed time normalization');
+      assert(Math.abs(ticks*M5_FIXED_DT-.38/response)<=M5_FIXED_DT+1e-9, 'keyboard setting changed time normalization');
       assert(Math.abs(target)<=1 && target*sign>0, 'keyboard tuning exceeded mechanical lock');
       const ordinary=racerrhiKeyboardTargetForM5(sim,sign);
       if(speed>=50) assert(strength<1?Math.abs(target)<Math.abs(ordinary):strength>1?Math.abs(target)>Math.abs(ordinary):target===ordinary);
