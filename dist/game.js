@@ -71,7 +71,7 @@ const rocks=new T.InstancedMesh(new T.IcosahedronGeometry(1,3),rockMat,160);for(
 function sign(text,w=10,h=2,bg='#172d28',fg='#e3f0cf'){const c=document.createElement('canvas');c.width=1024;c.height=256;const ctx=c.getContext('2d');ctx.fillStyle=bg;ctx.fillRect(0,0,1024,256);ctx.fillStyle=fg;ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='700 95px Arial';ctx.fillText(text,512,135,940);const tx=new T.CanvasTexture(c);tx.colorSpace=T.SRGBColorSpace;return new T.Mesh(new T.PlaneGeometry(w,h),new T.MeshBasicMaterial({map:tx,side:T.DoubleSide}));}
 function trackObject(t,offset,obj,lift=0){const a=at(t);obj.position.copy(a.p).addScaledVector(a.n,offset);obj.position.y+=lift;obj.rotation.y=Math.atan2(a.d.x,a.d.z);scene.add(obj);return obj;}
 // Open, signed dirt access before the pit buildings; readable from the grid.
-const entranceBoard=sign('RALLY  →  /  DIRT LOOP',13,2.2,'#433b2c','#ffe9b1');entranceBoard.position.set(-211,16.5,-180);entranceBoard.rotation.y=Math.PI;scene.add(entranceBoard);
+const entranceBoard=sign('←  RALLY  /  DIRT LOOP',13,2.2,'#433b2c','#ffe9b1');entranceBoard.position.set(-211,16.5,-180);entranceBoard.rotation.y=Math.PI;scene.add(entranceBoard);
 for(const x of [-216,-202])box(.22,4,.22,dark,x,15,-180);
 const routeBoard=sign((rally.length/1000).toFixed(1)+' KM  /  HILL ROUTE',9,1.4,'#433b2c','#ffe9b1');routeBoard.position.set(-184,16,-202);scene.add(routeBoard);
 // Start gantry, painted grid and pit lane.
