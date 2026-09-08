@@ -1,7 +1,7 @@
 import { Simulation } from '../.vendor/Racing26/src/physics/Simulation';
 import { PhysicsMath } from '../.vendor/Racing26/src/physics/math/PhysicsMath';
 import type { VehicleState } from '../.vendor/Racing26/src/types';
-import { racerrhiSteeringTargetForM5 } from './m5-steering-adapter';
+import { racerrhiSteeringTargetForM5, updateRacerrhiKeyboardSteeringInput } from './m5-steering-adapter';
 import { racerrhiSurfaceMaterialForDistance } from './m5-surface-adapter';
 import { createRacerrhiM5Config, RACERRHI_M5_REFERENCE_LOADS } from './m5-config';
 
@@ -119,6 +119,8 @@ export type M5ControlInput = {
   throttle?: number;
   brake?: number;
   handbrake?: boolean;
+  keyboardResponse?: number;
+  keyboardStrength?: number;
   /** Binary keyboard/button intent. +1 is donor left, -1 donor right. */
   digitalSteerDirection?: -1 | 0 | 1;
   /** Racerrhi on-screen hand-wheel target in [-1, 1]. */
@@ -412,14 +414,30 @@ function steeringInputsForStep(sim: Simulation, input: M5ControlInput) {
     // Seed the incoming controller from the current effective command so a touch
     // takeover preserves steering continuity, then let the donor's analog slew
     // move toward the new hand position at its normal rate.
+    const mappedTouchTarget = racerrhiSteeringTargetForM5(
+      sim,
+      finite(input.analogSteerTarget)
+    );
     if (
       Math.abs(sim.analogSteeringInput) <= 1e-7 &&
       Math.abs(sim.digitalSteeringInput) > 1e-7
     ) {
-      sim.resetAnalogSteeringInput(sim.digitalSteeringInput);
+      const outgoingDigital = sim.digitalSteeringInput;
+      sim.resetAnalogSteeringInput(outgoingDigital);
+
+      // Opposite-direction ownership changes are explicitly two-stage. On the
+      // first touch-owned fixed step, unwind the outgoing keyboard request only
+      // toward center; do not let the donor's fast analog reversal cross center
+      // in one tick just because the high-speed digital envelope is small.
+      if (
+        mappedTouchTarget !== 0 &&
+        Math.sign(mappedTouchTarget) !== Math.sign(outgoingDigital)
+      ) {
+        return { analogSteerTarget: 0 };
+      }
     }
     return {
-      analogSteerTarget: racerrhiSteeringTargetForM5(sim, finite(input.analogSteerTarget)),
+      analogSteerTarget: mappedTouchTarget,
     };
   }
 
@@ -435,11 +453,25 @@ function steeringInputsForStep(sim: Simulation, input: M5ControlInput) {
       Math.abs(sim.digitalSteeringInput) <= 1e-7 &&
       Math.abs(sim.analogSteeringInput) > 1e-7
     ) {
-      // Symmetric handoff back to keyboard. Digital steering keeps its own
-      // speed envelope and fast countersteer/reversal rates after this seed.
+      // Seed keyboard ownership from the outgoing analog command so handoff is
+      // continuous, then let Racerrhi's time-normalized key ramp take over.
       sim.resetDigitalSteeringInput(sim.analogSteeringInput);
     }
-    return { digitalSteerDirection: direction };
+
+    const nextDigital = updateRacerrhiKeyboardSteeringInput(
+      sim,
+      sim.digitalSteeringInput,
+      direction,
+      sim.fixedDt,
+      input
+    );
+    sim.resetAnalogSteeringInput(0);
+    sim.resetDigitalSteeringInput(nextDigital);
+
+    // Supply the already-integrated rack request directly. Passing
+    // digitalSteerDirection here would apply the donor's second fixed-rate slew
+    // and reintroduce the high-speed "instant limit" problem.
+    return { steer: nextDigital };
   }
 
   if (Number.isFinite(input.analogSteerTarget)) {

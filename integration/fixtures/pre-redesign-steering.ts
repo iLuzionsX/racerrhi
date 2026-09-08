@@ -1,0 +1,82 @@
+// Test-only reference frozen from main e37ce0d. Never import from runtime code.
+// Keeps pre-redesign rack trajectories and historical measurements reproducible.
+import { Simulation } from '../../.vendor/Racing26/src/physics/Simulation';
+import { PhysicsMath } from '../../.vendor/Racing26/src/physics/math/PhysicsMath';
+import { digitalCountersteerRecoveryBlend } from '../../.vendor/Racing26/src/physics/DigitalSteeringInput';
+
+// Racerrhi's on-screen wheel is deliberately compact: +/-135 deg from center.
+// Racing26's M5 mobile steering is calibrated around 900 deg lock-to-lock
+// (+/-450 deg). The adapter converts Racerrhi hand travel into the M5 rack scale.
+export const RACERRHI_HAND_WHEEL_ONE_WAY_DEG = 135;
+export const M5_HAND_WHEEL_ONE_WAY_DEG = 450;
+export const ROAD_SPEED_HAND_TO_RACK_SCALE =
+  RACERRHI_HAND_WHEEL_ONE_WAY_DEG / M5_HAND_WHEEL_ONE_WAY_DEG;
+
+function smoothstep01(value: number): number {
+  const t = PhysicsMath.clamp(value, 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
+export function preRedesignTouchTarget(sim: Simulation, racerrhiSteer: number): number {
+  const raw = PhysicsMath.clamp(Number(racerrhiSteer) || 0, -1, 1);
+  if (Math.abs(raw) < 1e-9) return 0;
+
+  // Racerrhi input sign is opposite Racing26's canonical +left convention.
+  const physicalDirectionTarget = -raw;
+
+  const localVelocity = sim.vehicle.rigidBody.getLocalVelocity();
+  const localAngularVelocity = sim.vehicle.rigidBody.getLocalAngularVelocity();
+  const speedMs = Math.hypot(localVelocity.x, localVelocity.z);
+  const sideslipRad =
+    speedMs > 0.5
+      ? Math.atan2(localVelocity.x, Math.max(0.5, Math.abs(localVelocity.z)))
+      : 0;
+
+  // Preserve the proven parking/corner-entry mapping and recovery calibration.
+  const speedKmh = speedMs * 3.6;
+  const roadSpeedBlend = smoothstep01((speedMs - 9) / 10);
+  let scale = PhysicsMath.lerp(1.0, ROAD_SPEED_HAND_TO_RACK_SCALE, roadSpeedBlend);
+  // Above 100 km/h continue reducing sensitivity instead of holding the same
+  // ratio all the way to top speed. Zero endpoint slopes avoid a gain step.
+  const highSpeedBlend = smoothstep01((speedKmh - 100) / 120);
+  scale = PhysicsMath.lerp(scale, 0.12, highSpeedBlend);
+
+  // Severe opposite-lock recovery may temporarily unlock more rack authority.
+  const direction = Math.sign(physicalDirectionTarget) as -1 | 1;
+  const recoveryBlend = digitalCountersteerRecoveryBlend(direction, speedMs, {
+    wheelbaseM: sim.vehicle.config.wheelbase,
+    maxSteerAngleRad: sim.vehicle.config.maxSteerAngle,
+    yawRateRadS: localAngularVelocity.y,
+    sideslipRad,
+    forwardSpeedMs: localVelocity.z,
+  });
+  scale = PhysicsMath.lerp(scale, 1.0, recoveryBlend);
+
+  // A mild cubic curve gives small hand corrections more resolution without a
+  // deadzone or sacrificing endpoint lock. Fade it out for opposite-lock catches;
+  // retain the donor's existing slew/release timing and ownership handoff.
+  const precisionBlend = 0.25 * highSpeedBlend * (1 - recoveryBlend);
+  const shapedTarget = PhysicsMath.lerp(
+    physicalDirectionTarget,
+    physicalDirectionTarget ** 3,
+    precisionBlend
+  );
+  return PhysicsMath.clamp(shapedTarget * scale, -1, 1);
+}
+
+
+// Convert a reference rack request into an explicit thumb position under the new
+// fixed curve. Used only for equal-rack physics comparisons, never input-feel tests.
+export function touchForPreRedesignRack(sim: Simulation, oldHand: number): number {
+  const target = -preRedesignTouchTarget(sim, oldHand);
+  let low = 0;
+  let high = 1;
+  for (let i = 0; i < 40; i++) {
+    const mid = (low + high) / 2;
+    const rack = 0.30 * mid + 0.70 * mid ** 4.5;
+    if (rack < Math.abs(target)) low = mid;
+    else high = mid;
+  }
+  return Math.sign(target) * (low + high) / 2;
+}
+

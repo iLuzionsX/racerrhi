@@ -1,6 +1,7 @@
 import { strict as assert } from 'node:assert';
 import fs from 'node:fs';
 import * as THREE from 'three';
+import { nearestRoadProjection } from '../dist/road-projection.mjs';
 import { Simulation } from '../.vendor/Racing26/src/physics/Simulation';
 import { SuspensionSystem } from '../.vendor/Racing26/src/physics/Suspension';
 import { createRacerrhiM5Config } from './m5-config';
@@ -53,8 +54,9 @@ const game = fs.readFileSync(new URL('../dist/game.js', import.meta.url), 'utf8'
 const start = game.indexOf('const points=');
 const end = game.indexOf('setSurfaceSampler(', start);
 assert(start >= 0 && end > start, 'could not find production track definition');
-const { at, nearest, length, N } = new Function('T', 'V', 'clamp', '$', game.slice(start, end) + '\nreturn {at,nearest,length,N};')(
+const { at, nearest, length, N } = new Function('T', 'V', 'clamp', '$', 'nearestRoadProjection', game.slice(start, end) + '\nreturn {at,nearest,length,N};')(
   THREE, (x: number, y: number, z: number) => new THREE.Vector3(x, y, z), THREE.MathUtils.clamp, () => ({ textContent: '' }),
+  nearestRoadProjection,
 );
 
 function driveCorner(lookaheadM: number, flatten: boolean) {

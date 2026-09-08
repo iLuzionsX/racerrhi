@@ -50,7 +50,8 @@ if (process.env.RACERRHI_SMOKE_URL && !url.startsWith('https://')) {
 }
 
 const browser = await chromium.launch({
-  headless: false,
+  headless: process.env.RACERRHI_HEADLESS === '1',
+  executablePath: process.env.RACERRHI_CHROMIUM || undefined,
   args: [
     '--enable-webgl',
     '--ignore-gpu-blocklist',
@@ -79,7 +80,9 @@ async function assertRenderableCanvas(page) {
     throw new Error('WebGL canvas did not occupy the CI playability viewport');
   }
 
-  const pngBuffer = await canvas.screenshot();
+  // Adaptive resolution can change canvas backing dimensions while it renders.
+  // Capture its visible bounds without an element-stability wait.
+  const pngBuffer = await page.screenshot({ clip: box });
   const png = PNG.sync.read(pngBuffer);
   let sum = 0;
   let sumSq = 0;
@@ -127,12 +130,30 @@ async function assertExpectedBuildInfo(page) {
 }
 
 const desktop = await browser.newContext({ viewport: { width: 480, height: 270 }, deviceScaleFactor: 1 });
+await desktop.addInitScript(() => { globalThis.__racerrhiDiagnostics = {}; });
 const desktopPage = await desktop.newPage();
 const desktopErrors = pageDiagnostics(desktopPage);
 await waitUntilPlayable(desktopPage);
 const liveBuildInfo = await assertExpectedBuildInfo(desktopPage);
 if (liveBuildInfo) console.log('LIVE_BUILD_INFO ' + JSON.stringify(liveBuildInfo));
 const desktopCanvas = await assertRenderableCanvas(desktopPage);
+fs.mkdirSync('artifacts',{recursive:true});await desktopPage.screenshot({path:'artifacts/graphics-startup.png'});
+
+// Tune using real keyboard events, reload, and confirm the saved values reach
+// the live physics input rather than only changing labels in the settings UI.
+await desktopPage.click('#open-settings');
+for (const [id,steps] of [['keyboard-response',16],['keyboard-strength',7]]) {
+  const slider=desktopPage.locator('#'+id);
+  await slider.focus();await slider.press('Home');
+  for(let i=0;i<steps;i++) await slider.press('ArrowRight');
+}
+await desktopPage.click('#close-settings');
+await waitUntilPlayable(desktopPage);
+const keyboardSettings=await desktopPage.evaluate(async()=>{
+  const {config}=await import('./ui.js?v=7');
+  return {response:config.keyboardResponse,strength:config.keyboardStrength};
+});
+if(keyboardSettings.response!==1.5||keyboardSettings.strength!==1.1) throw new Error('keyboard settings failed to persist: '+JSON.stringify(keyboardSettings));
 
 await desktopPage.click('#drive');
 await desktopPage.bringToFront();
@@ -162,6 +183,8 @@ const desktopSpeed = Number((await desktopPage.locator('#speed').textContent()) 
 await desktopPage.keyboard.up('ArrowLeft');
 await desktopPage.keyboard.up('ArrowUp');
 if (!(desktopSpeed > 0)) throw new Error('keyboard throttle did not move the car after countdown');
+const keyboardPhysics=await desktopPage.evaluate(()=>globalThis.__racerrhiDiagnostics.lastPhysicsInput);
+if(keyboardPhysics.keyboardResponse!==1.5||keyboardPhysics.keyboardStrength!==1.1) throw new Error('keyboard tuning did not reach live physics');
 
 // Exercise session state transitions in the same real browser that rendered and drove.
 await desktopPage.click('#pause');
@@ -184,6 +207,20 @@ await desktopPage.waitForFunction(() =>
   document.getElementById('pause-dialog')?.open === false
 );
 const desktopCanvasAfterExit = await assertRenderableCanvas(desktopPage);
+// Retain a full-size rendered review image of the actual car/tyre placement.
+await desktopPage.setViewportSize({width:1280,height:720});
+fs.mkdirSync('artifacts',{recursive:true});
+await desktopPage.screenshot({path:'artifacts/handling-preview.png'});
+const graphics = await desktopPage.evaluate(() => globalThis.__racerrhiGraphics);
+if (graphics) {
+ if (!(graphics.reflections > 1)) throw new Error('Circuit reflection probe did not update');
+ await desktopPage.evaluate(() => { const q=document.getElementById('quality');q.value='high';q.dispatchEvent(new Event('change',{bubbles:true})); });
+ await desktopPage.waitForFunction(before => globalThis.__racerrhiGraphics.reflections > before + 2, graphics.reflections);
+ await assertRenderableCanvas(desktopPage);
+ await desktopPage.screenshot({path:'artifacts/graphics-high.png'});
+ console.log('PASS animated circuit reflections and High quality rendering', graphics);
+}
+
 if (desktopErrors.length) throw new Error('desktop startup/session errors: ' + desktopErrors.join(' | '));
 await desktop.close();
 
@@ -238,7 +275,7 @@ await mobilePage.evaluate(() => {
 });
 
 const readUiState = () => mobilePage.evaluate(async () => {
-  const { input } = await import('./ui.js?v=5');
+  const { input } = await import('./ui.js?v=7');
   const wheel = document.getElementById('wheel');
   return {
     ...input,
@@ -398,7 +435,21 @@ await touch('touchStart', [tp(cx, cy, 92)]);
 const regrab = await readUiState();
 if (Math.abs(regrab.steer) > 0.05) throw new Error('center re-grab jumped steering');
 await touch('touchEnd');
-mobileResults.thumbDrag = { smallDrag, verticalDrag, unwind, regrab };
+
+// A center grab must reach full lock in either direction without needing finger
+// travel beyond the visible wheel, even when the control is parked near an edge.
+await touch('touchStart', [tp(cx, cy, 94)]);
+await gestureMove([tp(Math.max(2, cx - wheelBox.width * 0.48), cy, 94)]);
+const edgeLeft = await readUiState();
+if (edgeLeft.steer > -0.999) throw new Error('near-edge center grab could not reach left full lock: ' + JSON.stringify(edgeLeft));
+await touch('touchEnd');
+await touch('touchStart', [tp(cx, cy, 95)]);
+await gestureMove([tp(Math.min(canvasBox.width - 2, cx + wheelBox.width * 0.48), cy, 95)]);
+const edgeRight = await readUiState();
+if (edgeRight.steer < 0.999) throw new Error('near-edge center grab could not reach right full lock: ' + JSON.stringify(edgeRight));
+await touch('touchEnd');
+
+mobileResults.thumbDrag = { smallDrag, verticalDrag, unwind, regrab, edgeLeft, edgeRight };
 
 // The saved rotary option remains usable, including crossing the wheel hub.
 async function selectWheelMode(mode) {
@@ -422,14 +473,17 @@ if (savedMode !== 'drag') throw new Error('wheel gesture setting did not persist
 // Normal release: input ownership must clear immediately; visual recenter is tracked separately.
 await clearPointerTrace();
 await touch('touchStart', [wheelPoint(1)]);
-await waitUi(async () => (await import('./ui.js?v=5')).input.held === true, 'wheel did not enter held state');
+await waitUi(async () => (await import('./ui.js?v=7')).input.held === true, 'wheel did not enter held state');
 const normalPointerId = await activeWheelPointerId();
 await touch('touchMove', [wheelPoint(1, true)]);
-await waitUi(async () => Math.abs((await import('./ui.js?v=5')).input.steer) > 0.10, 'wheel move did not create steering request');
+await waitUi(async () => Math.abs((await import('./ui.js?v=7')).input.steer) > 0.10, 'wheel move did not create steering request');
 const normalBeforeRelease = await readUiState();
 await touch('touchEnd');
-await waitUi(async () => (await import('./ui.js?v=5')).input.held === false, 'normal wheel release left input held');
+await waitUi(async () => (await import('./ui.js?v=7')).input.held === false, 'normal wheel release left input held');
 const normalAfterRelease = await readUiState();
+if (Math.abs(normalAfterRelease.steer) > 1e-9) {
+  throw new Error('normal wheel release did not clear steering target immediately: ' + JSON.stringify(normalAfterRelease));
+}
 const normalTrace = await readPointerTrace();
 const normalUp = normalTrace.find((entry) => entry.type === 'pointerup' && entry.pointerId === normalPointerId);
 if (!normalUp) throw new Error('normal release did not produce pointerup for captured wheel pointer: ' + JSON.stringify(normalTrace));
@@ -444,11 +498,11 @@ mobileResults.normalRelease = {
 // Release outside the wheel must still clear the captured steering owner.
 await clearPointerTrace();
 await touch('touchStart', [wheelPoint(2)]);
-await waitUi(async () => (await import('./ui.js?v=5')).input.held === true, 'outside-release wheel did not enter held state');
+await waitUi(async () => (await import('./ui.js?v=7')).input.held === true, 'outside-release wheel did not enter held state');
 const outsidePointerId = await activeWheelPointerId();
 await touch('touchMove', [tp(wheelOutsideX, wheelOutsideY, 2)]);
 await touch('touchEnd');
-await waitUi(async () => (await import('./ui.js?v=5')).input.held === false, 'release outside wheel left steering held');
+await waitUi(async () => (await import('./ui.js?v=7')).input.held === false, 'release outside wheel left steering held');
 const outsideTrace = await readPointerTrace();
 if (!outsideTrace.some((entry) => entry.type === 'pointerup' && entry.pointerId === outsidePointerId && entry.control === 'wheel')) {
   throw new Error('captured outside release was not delivered back to wheel: ' + JSON.stringify(outsideTrace));
@@ -463,12 +517,12 @@ mobileResults.outsideRelease = {
 // Cancellation may leave a decaying visual/request value, but it must release analog ownership.
 await clearPointerTrace();
 await touch('touchStart', [wheelPoint(3)]);
-await waitUi(async () => (await import('./ui.js?v=5')).input.held === true, 'cancel wheel did not enter held state');
+await waitUi(async () => (await import('./ui.js?v=7')).input.held === true, 'cancel wheel did not enter held state');
 const cancelPointerId = await activeWheelPointerId();
 await touch('touchMove', [wheelPoint(3, true)]);
-await waitUi(async () => Math.abs((await import('./ui.js?v=5')).input.steer) > 0.10, 'cancel setup did not create steering request');
+await waitUi(async () => Math.abs((await import('./ui.js?v=7')).input.steer) > 0.10, 'cancel setup did not create steering request');
 await touch('touchCancel');
-await waitUi(async () => (await import('./ui.js?v=5')).input.held === false, 'pointercancel left analog steering ownership held');
+await waitUi(async () => (await import('./ui.js?v=7')).input.held === false, 'pointercancel left analog steering ownership held');
 const cancelTrace = await readPointerTrace();
 if (!cancelTrace.some((entry) => entry.type === 'pointercancel' && entry.pointerId === cancelPointerId)) {
   throw new Error('trusted pointercancel was not observed for wheel: ' + JSON.stringify(cancelTrace));
@@ -483,14 +537,14 @@ mobileResults.cancel = {
 // Unexpected capture loss must be idempotent and release only the captured wheel owner.
 await clearPointerTrace();
 await touch('touchStart', [wheelPoint(4)]);
-await waitUi(async () => (await import('./ui.js?v=5')).input.held === true, 'capture-loss wheel did not enter held state');
+await waitUi(async () => (await import('./ui.js?v=7')).input.held === true, 'capture-loss wheel did not enter held state');
 const lostPointerId = await activeWheelPointerId();
 await touch('touchMove', [wheelPoint(4, true)]);
 await wheel.evaluate((el, pointerId) => el.releasePointerCapture(pointerId), lostPointerId);
 // Pointer capture changes are processed on the next pointer event. Use the still-active
 // trusted touch source to flush the pending loss instead of fabricating a DOM PointerEvent.
 await touch('touchMove', [tp(wheelOutsideX, wheelOutsideY, 4)]);
-await waitUi(async () => (await import('./ui.js?v=5')).input.held === false, 'lostpointercapture left analog steering ownership held');
+await waitUi(async () => (await import('./ui.js?v=7')).input.held === false, 'lostpointercapture left analog steering ownership held');
 const lostTraceBeforeEnd = await readPointerTrace();
 if (!lostTraceBeforeEnd.some((entry) => entry.type === 'lostpointercapture' && entry.pointerId === lostPointerId)) {
   throw new Error('browser did not emit lostpointercapture for released wheel capture: ' + JSON.stringify(lostTraceBeforeEnd));

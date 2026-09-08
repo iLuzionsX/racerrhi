@@ -1,0 +1,11 @@
+BMW G90 M5 by JUSTGAME
+https://sketchfab.com/3d-models/bmw-g90-m5-9dc9e5c88bec4faa94552fdd0b76ed21
+https://sketchfab.com/JUSTGAME
+
+Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0).
+https://creativecommons.org/licenses/by/4.0/
+
+Changes by Racerrhi: baked transforms; batched geometry; removed hidden engine;
+reassigned misplaced wheel parts; physics-hub alignment; material calibration;
+Draco geometry compression and WebP texture compression.
+No affiliation with or endorsement by BMW or the model author is implied.

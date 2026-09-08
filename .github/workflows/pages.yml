@@ -1,7 +1,7 @@
 name: Publish APEX to GitHub Pages
 on:
   push:
-    branches: [main, astra/physics-pipeline-repair, astra/progressive-tyre-recovery, astra/slide-recovery-unwind, astra/chassis-wheel-visual-sync, astra/progressive-speed-steering, astra/slide-braking-friction]
+    branches: [main, astra/physics-pipeline-repair, astra/progressive-tyre-recovery, astra/slide-recovery-unwind, astra/chassis-wheel-visual-sync, astra/progressive-speed-steering, astra/slide-braking-friction, astra/intuitive-steering-inputs, astra/vegas-reward-loop, astra/console-graphics, astra/next-gen-g90]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -18,6 +18,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Download 2K scanned surfaces and HDR
+        run: node download-assets-hq.mjs
       - name: Fetch pinned Racing26 M5 donor
         if: ${{ hashFiles('integration/m5-bridge.ts') != '' }}
         run: |
@@ -44,7 +46,7 @@ jobs:
         run: npx --yes tsx@4.20.6 integration/m5-racerrhi-recovery.test.ts
       - name: Validate uphill tire load timing and 119 km/h first corner
         run: npx --yes tsx@4.20.6 integration/m5-uphill-corner-regression.test.ts
-      - name: Validate progressive speed steering and high-speed release
+      - name: Validate fixed touch mapping and time-normalized keyboard steering
         run: npx --yes tsx@4.20.6 integration/m5-speed-steering-regression.test.ts
       - name: Validate Racerrhi first-turn steering
         run: npx --yes tsx@4.20.6 integration/m5-first-turn-regression.test.ts
@@ -73,6 +75,18 @@ jobs:
         run: xvfb-run -a node integration/browser-smoke.mjs
       - name: Verify independent mobile multi-touch ownership
         run: xvfb-run -a node integration/mobile-pointer-smoke.mjs
+      - name: Save rendered handling preview for visual review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: handling-visual-review
+          path: artifacts/handling-preview.png
+      - name: Save browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphics-browser-evidence
+          path: artifacts/
   deploy:
     needs: validate
     if: github.event_name != 'pull_request'
@@ -89,6 +103,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Download 2K scanned surfaces and HDR
+        run: node download-assets-hq.mjs
       - name: Fetch pinned Racing26 M5 donor
         run: |
           mkdir -p .vendor
@@ -135,6 +151,10 @@ jobs:
               astra/slide-recovery-unwind) PREVIEW_SLUG="slide-recovery-unwind" ;;
               astra/progressive-speed-steering) PREVIEW_SLUG="progressive-speed-steering" ;;
               astra/slide-braking-friction) PREVIEW_SLUG="slide-braking-friction" ;;
+              astra/console-graphics) PREVIEW_SLUG="console-graphics" ;;
+              astra/next-gen-g90) PREVIEW_SLUG="next-gen-g90" ;;
+              astra/intuitive-steering-inputs) PREVIEW_SLUG="intuitive-steering-inputs" ;;
+              astra/vegas-reward-loop) PREVIEW_SLUG="vegas-reward-loop" ;;
               astra/chassis-wheel-visual-sync) PREVIEW_SLUG="chassis-wheel-visual-sync" ;;
               astra/physics-pipeline-repair) PREVIEW_SLUG="pr-16" ;;
               *) PREVIEW_SLUG="branch-preview" ;;
@@ -151,12 +171,12 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
       - name: Install deployed-preview browser smoke dependencies
-        if: github.ref_name == 'astra/slide-recovery-unwind' || github.ref_name == 'astra/progressive-speed-steering' || github.ref_name == 'astra/slide-braking-friction'
+        if: github.ref_name == 'astra/next-gen-g90' || github.ref_name == 'astra/console-graphics' || github.ref_name == 'astra/slide-recovery-unwind' || github.ref_name == 'astra/progressive-speed-steering' || github.ref_name == 'astra/slide-braking-friction' || github.ref_name == 'astra/intuitive-steering-inputs'
         run: |
           npm install --no-package-lock --no-save playwright@1.55.0 pngjs@7.0.0
           npx playwright install --with-deps chromium
       - name: Verify deployed public preview in real Chromium
-        if: github.ref_name == 'astra/slide-recovery-unwind' || github.ref_name == 'astra/progressive-speed-steering' || github.ref_name == 'astra/slide-braking-friction'
+        if: github.ref_name == 'astra/next-gen-g90' || github.ref_name == 'astra/console-graphics' || github.ref_name == 'astra/slide-recovery-unwind' || github.ref_name == 'astra/progressive-speed-steering' || github.ref_name == 'astra/slide-braking-friction' || github.ref_name == 'astra/intuitive-steering-inputs'
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
           EXPECTED_COMMIT: ${{ github.sha }}
