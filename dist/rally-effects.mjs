@@ -26,7 +26,7 @@ export function createRallyDust(scene){
  function reset(){for(const p of particles)p.life=0;opacity.fill(0);carry.clear();points.visible=false;geometry.attributes.opacity.needsUpdate=true;}
  return {
   object:points,reset,
-  quality(value){limit=value==='high'?capacity:128;for(let i=limit;i<capacity;i++){particles[i].life=0;opacity[i]=0;}cursor%=limit;},
+  quality(value){limit=value==='high'?capacity:128;for(let i=limit;i<capacity;i++){particles[i].life=0;opacity[i]=0;}cursor%=limit;geometry.attributes.opacity.needsUpdate=true;},
   update(dt,signal,car,viewportHeight,enabled=true){
    const step=Math.max(0,Math.min(.06,dt));material.uniforms.pointScale.value=viewportHeight*.85;
    if(enabled)for(const source of signal.sources){
