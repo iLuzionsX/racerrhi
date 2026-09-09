@@ -62,6 +62,15 @@ jobs:
         run: npx --yes tsx@4.20.6 integration/m5-slide-braking-regression.test.ts
       - name: Validate connected rally surface and full-loop driving
         run: npx --yes tsx@4.20.6 integration/rally-route-regression.test.ts
+      - name: Validate actual rally entrance gameplay and terrain contact
+        run: |
+          npx --yes tsx@4.20.6 integration/rally-entry-regression.test.ts
+          npx --yes tsx@4.20.6 integration/rally-terrain-regression.test.ts
+          npx --yes tsx@4.20.6 integration/rally-contact-regression.test.ts
+      - name: Validate granular tire forces, braking, slides and faster rally laps
+        run: |
+          npx --yes tsx@4.20.6 integration/rally-dynamics-regression.test.ts
+          npx --yes tsx@4.20.6 integration/rally-driving-regression.test.ts
       - name: Validate game
         run: |
           if [ -f dist/m5-runtime.js ]; then node --check dist/m5-runtime.js; fi
@@ -81,7 +90,7 @@ jobs:
         if: github.ref_name == 'astra/rally-realism'
         uses: actions/checkout@v4
         with:
-          ref: b41bcac6839060bb2cd724a1f0f3646dd786bf4b
+          ref: a6b99002e8eaac7b8b3d20cb20deff4bd43d2ff8
           path: baseline
       - name: Prepare baseline runtime and identical source textures
         if: github.ref_name == 'astra/rally-realism'
@@ -216,3 +225,12 @@ jobs:
             sleep 10
           done
           test "$passed" -eq 1
+          if [ "${{ github.ref_name }}" = "astra/rally-realism" ]; then
+            RACERRHI_SMOKE_URL="$LIVE_URL" RACERRHI_EXPECTED_COMMIT="$EXPECTED_COMMIT" xvfb-run -a node integration/rally-gameplay-browser.mjs
+          fi
+      - name: Save public rally gameplay verification
+        if: always() && github.ref_name == 'astra/rally-realism'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rally-public-gameplay-evidence
+          path: artifacts/rally-*

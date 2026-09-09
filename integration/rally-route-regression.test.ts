@@ -4,14 +4,8 @@ import * as T from 'three';
 import {createRallyRoute,rallyEntrance} from '../dist/rally-route.mjs';
 import {nearestRoadProjection} from '../dist/road-projection.mjs';
 import {newCar,setCarPose,setSurfaceSampler,stepCar,M5_FIXED_DT} from './m5-bridge';
-const route=createRallyRoute();
-const game=fs.readFileSync(new URL('../dist/game.js',import.meta.url),'utf8');
-const pointSource=game.match(/const points=\[(.*?)\];/)![1];
-const points=[...pointSource.matchAll(/V\(([^)]+)\)/g)].map(m=>new T.Vector3(...m[1].split(',').map(Number) as [number,number,number]));
-const curve=new T.CatmullRomCurve3(points,true,'centripetal');curve.arcLengthDivisions=4000;
-const samples=Array.from({length:1400},(_,i)=>({p:curve.getPointAt(i/1400),d:curve.getTangentAt(i/1400).normalize()}));
-function paved(x:number,z:number){const {index,fraction}=nearestRoadProjection(samples,x,z),a=samples[index],b=samples[(index+1)%samples.length],p=a.p.clone().lerp(b.p,fraction),d=a.d.clone().lerp(b.d,fraction).normalize();return {p,d,distance:Math.hypot(x-p.x,z-p.z)};}
-const sample=(x:number,z:number)=>route.surface(x,z,paved(x,z),(x:number,z:number)=>route.nearest(x,z).p.y);
+import {rallyGameplayFixture} from './rally-gameplay-fixture';
+const fixture=rallyGameplayFixture(),{rally:route,game,samples,nearest:paved,sample}=fixture;
 assert(route.length>800&&route.length<1800);
 let maxGrade=0,minY=Infinity,maxY=-Infinity,minClearance=Infinity,maxStep=0;
 for(const path of route.paths)for(let i=0;i<path.samples.length;i++){
@@ -19,7 +13,7 @@ for(const path of route.paths)for(let i=0;i<path.samples.length;i++){
  maxGrade=Math.max(maxGrade,Math.abs(a.d.y)/Math.hypot(a.d.x,a.d.z));minY=Math.min(minY,a.p.y);maxY=Math.max(maxY,a.p.y);
  if(path.name==='loop')minClearance=Math.min(minClearance,paved(a.p.x,a.p.z).distance);
  if(i)maxStep=Math.max(maxStep,Math.abs(a.p.y-path.samples[i-1].p.y));
- if(paved(a.p.x,a.p.z).distance>18){const s=sample(a.p.x,a.p.z);assert.equal(s.material.type,'gravel');assert(s.material.friction<.7&&s.material.friction>.5);assert(Math.abs(s.p.y-a.p.y)<.01);}
+ if(paved(a.p.x,a.p.z).distance>18){const s=sample(a.p.x,a.p.z);assert.equal(s.material.type,'gravel');assert(s.material.friction<.7&&s.material.friction>.5);assert(Math.abs(s.p.y-a.p.y)<.035);}
 }
 assert(maxGrade<.27,'rally hill too steep');assert(maxY-minY>25);assert(minClearance>22,'rally intersects existing circuit');assert(maxStep<.55);
 // Original asphalt height and material sampling remain authoritative everywhere.
@@ -27,7 +21,6 @@ for(const a of samples.filter((_,i)=>i%7===0))assert.equal(sample(a.p.x,a.p.z).m
 let previous=sample(-225,-191),largestSeam=0;
 for(let x=-224.9;x<=-180;x+=.1){const s=sample(x,-191);largestSeam=Math.max(largestSeam,Math.abs(s.p.y-previous.p.y));previous=s;}
 assert(largestSeam<.05,'entrance has a vertical discontinuity');assert(rallyEntrance(-209,-191));assert(!rallyEntrance(-209,-150));
-assert(game.includes('!lastRoad.rally && lastRoad.distance>14.5 && !rallyEntrance'));
 assert(game.includes('if(lastRoad.rally)lap.valid=false'));
 // Settle the actual pinned vehicle on twelve representative rally grades.
 setSurfaceSampler(sample);
@@ -50,7 +43,8 @@ for(let tick=0;tick<24000&&travel<.98;tick++){
  const target=loop.curve.getPointAt((t+look/route.length)%1),error=Math.atan2(Math.sin(Math.atan2(target.x-driver.x,target.z-driver.z)-driver.heading),Math.cos(Math.atan2(target.x-driver.x,target.z-driver.z)-driver.heading));
  const rack=Math.max(-1,Math.min(1,Math.atan2(2*driver._m5.vehicle.config.wheelbase*Math.sin(error),look)/driver._m5.vehicle.config.maxSteerAngle));
  let lo=0,hi=1;for(let j=0;j<18;j++){const mid=(lo+hi)/2;if(.30*mid+.70*mid**4.5<Math.abs(rack))lo=mid;else hi=mid;}
- stepCar(driver,{analogSteerActive:true,analogSteerTarget:-Math.sign(rack)*(lo+hi)/2,throttle:Math.max(0,Math.min(1,.22+(10-driver.speed)*.25)),brake:Math.max(0,Math.min(1,(driver.speed-11)*.25))},M5_FIXED_DT);
+ fixture.tick(driver,{analogSteerActive:true,analogSteerTarget:-Math.sign(rack)*(lo+hi)/2,throttle:Math.max(0,Math.min(1,.22+(10-driver.speed)*.25)),brake:Math.max(0,Math.min(1,(driver.speed-11)*.25))},M5_FIXED_DT);
+ assert(!driver.boundaryContact.active,'gameplay corrected rally driver back to circuit');
  maxDeviation=Math.max(maxDeviation,r.distance);maxSlip=Math.max(maxSlip,Math.abs(driver.slip));
  assert(Number.isFinite(driver.speed)&&Math.abs(driver.slip)<1,'rally driver became unstable');
 }

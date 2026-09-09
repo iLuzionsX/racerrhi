@@ -54,10 +54,11 @@ function baseGround(x,z){let r=nearest(x,z,10);if(r.distance<60)r=nearest(x,z);c
 function ground(x,z){
  const base=baseGround(x,z),paved=nearest(x,z,10),r=rally.nearest(x,z);
  const influence=clamp((paved.distance-17)/12,0,1)*(1-clamp((r.distance-14)/65,0,1));
- const ridge=r.p.y-.025-.3*(1-clamp((r.distance-3)/4,0,1))+(Math.sin(x*.031)*Math.cos(z*.027)*5)*clamp((r.distance-8)/30,0,1);
+ const graded=rally.terrainElevation(x,z)-.025-.3*(1-clamp((r.distance-3)/4,0,1))+(Math.sin(x*.031)*Math.cos(z*.027)*5)*clamp((r.distance-8)/30,0,1);
+ const ridge=T.MathUtils.lerp(Math.min(graded,rally.roadHeight(x,z,r)-.45),graded,clamp((r.distance-7)/4,0,1));
  return T.MathUtils.lerp(base,ridge,influence);
 }
-const rallyVisual=buildRallyVisuals(scene,rally,renderer);
+const rallyVisual=buildRallyVisuals(scene,rally,renderer,ground);
 for(let i=0;i<lp.count;i++){const x=lp.getX(i),z=lp.getZ(i);lp.setY(i,ground(x,z));const c=new T.Color().setHSL(.18+rand()*.025,.16+rand()*.12,.30+rand()*.10);landColors.push(c.r,c.g,c.b);}landGeo.setAttribute('color',new T.Float32BufferAttribute(landColors,3));landGeo.computeVertexNormals();terrainMat.vertexColors=true;mesh(landGeo,terrainMat);
 const waterMat=new T.ShaderMaterial({uniforms:{time:{value:0},sun:{value:sunDir},fogColor:{value:new T.Color('#b9b29a')}},vertexShader:'varying vec3 w; void main(){w=(modelMatrix*vec4(position,1.)).xyz;gl_Position=projectionMatrix*viewMatrix*vec4(w,1.);}',fragmentShader:`uniform float time;uniform vec3 sun;uniform vec3 fogColor;varying vec3 w;void main(){vec3 v=normalize(cameraPosition-w);float a=sin(w.x*.35+time*.9)+sin(w.z*.29-time*.6)+sin((w.x+w.z)*.7+time);vec3 n=normalize(vec3(cos(w.x*.35+time)*.08,1.,cos(w.z*.29-time*.6)*.06));float f=pow(1.-max(dot(n,v),0.),3.);float spec=pow(max(dot(reflect(-sun,n),v),0.),130.);vec3 c=mix(vec3(.045,.24,.27),vec3(.43,.54,.51),f)+vec3(1.,.70,.30)*spec*1.4+a*.006;c=mix(c,fogColor,1.-exp(-distance(cameraPosition,w)*.0006));gl_FragColor=vec4(c,1.);}`});const ocean=mesh(new T.PlaneGeometry(7000,7000),waterMat,-1300,-2,0);ocean.rotation.x=-Math.PI/2;
 // Tall ridgelines frame the inland horizon.
@@ -194,7 +195,7 @@ function simulate(dt){
    throttle:Math.max(touchInput.throttle,keys.has('arrowup')||keys.has('w')?1:0),
    brake:Math.max(touchInput.brake,keys.has('arrowdown')||keys.has('s')||keys.has(' ')?1:0)
   };
-  lastRoad=nearest(state.x,state.z);
+  lastRoad=drivingSurface(state.x,state.z);
   stepCar(state,input,dt,lastRoad);
   if(globalThis.__racerrhiDiagnostics){
    const sim=state._m5;
@@ -207,8 +208,8 @@ function simulate(dt){
     timestampMs:performance.now()
    };
   }
-  lastRoad=nearest(state.x,state.z);
-  if(!lastRoad.rally && lastRoad.distance>14.5 && !rallyEntrance(state.x,state.z)){
+  lastRoad=drivingSurface(state.x,state.z);
+  if(!lastRoad.rally && lastRoad.distance>14.5 && lastRoad.distance<18 && !rallyEntrance(state.x,state.z)){
    const side=lastRoad.side>=0?1:-1;
    resolveBoundaryContact(state,{
     roadPoint:{x:lastRoad.p.x,y:lastRoad.p.y,z:lastRoad.p.z},
@@ -217,7 +218,7 @@ function simulate(dt){
     distanceM:lastRoad.distance,
     limitDistanceM:14.4
    });
-   lastRoad=nearest(state.x,state.z);
+   lastRoad=drivingSurface(state.x,state.z);
    lap.valid=false;
   }
   if(lastRoad.rally)lap.valid=false;

@@ -29,7 +29,7 @@ export type M5Vec3 = {
 
 export type RoadSample = {
   normal?: Partial<M5Vec3>;
-  material?: { type: 'asphalt' | 'kerb' | 'gravel'; friction: number; rollingResistance: number; isKerbRumble: boolean };
+  material?: { type: 'asphalt' | 'kerb' | 'gravel'; friction: number; rollingResistance: number; looseness?: number; isKerbRumble: boolean };
   p?: Partial<M5Vec3>;
   d?: Partial<M5Vec3>;
   distance?: number;
@@ -228,6 +228,7 @@ function surfaceFromRoad(x: number, z: number) {
     type: material.type,
     friction: material.friction,
     rollingResistance: material.rollingResistance,
+    looseness: Math.max(0,Math.min(1,finite(material.looseness))),
     wetness: 0,
     isKerbRumble: material.isKerbRumble,
   };

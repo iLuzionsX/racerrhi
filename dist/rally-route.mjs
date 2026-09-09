@@ -1,13 +1,14 @@
 import * as T from 'three';
 
 const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
+const smooth=v=>{const t=clamp(v);return t*t*(3-2*t);};
 export const rallyEntrance=(x,z)=>x>-231&&x<-178&&z>-209&&z<-178;
 export function createRallyRoute(){
  const loop=[[-140,18,-140],[-135,22,-60],[-165,27,10],[-110,38,95],[-30,46,165],[45,41,110],[85,33,35],[25,29,5],[65,24,-85],[-10,18,-160],[-95,16,-180]];
  const access=[[-225,13,-191],[-206,13,-191],[-179,14,-194],[-150,16,-182],[-140,18,-140]];
  const paths=[{name:'access',points:access,closed:false},{name:'loop',points:loop,closed:true}].map(path=>{
   const curve=new T.CatmullRomCurve3(path.points.map(p=>new T.Vector3(...p)),path.closed,'centripetal');curve.arcLengthDivisions=2000;
-  const length=curve.getLength(),count=Math.ceil(length/2);
+  const length=curve.getLength(),count=Math.ceil(length/.75);
   const samples=Array.from({length:count+1},(_,i)=>{const t=i/count,p=curve.getPointAt(t),d=curve.getTangentAt(t).normalize(),n=new T.Vector3(d.z,0,-d.x).normalize();return {p,d,n,t};});
   return {...path,curve,length,samples};
  });
@@ -29,19 +30,40 @@ export function createRallyRoute(){
   const {s,u,px,pz}=best,d=s.a.d.clone().lerp(s.b.d,u).normalize(),n=new T.Vector3(d.z,0,-d.x).normalize();
   return {p:new T.Vector3(px,T.MathUtils.lerp(s.a.p.y,s.b.p.y,u),pz),d,n,t:T.MathUtils.lerp(s.a.t,s.b.t,u),distance:Math.sqrt(bestSq),side:(x-px)*n.x+(z-pz)*n.z,route:s.path,rally:true,surfaceOffset:.025};
  }
+ function roadHeight(x,z,r=nearest(x,z)){
+  const strength=r.route==='access'?smooth((r.t*paths[0].length-12)/35):1;
+  const crown=-.014*(Math.sqrt(r.side*r.side+.1)-Math.sqrt(.1));
+  const rut=-.01*Math.exp(-(((Math.abs(r.side)-1.05)/.28)**2));
+  // Spatially fixed centimetre undulations excite the real suspension. No camera
+  // shake, random vertical impulses, or frame-rate-dependent grip changes.
+  const rough=.012*Math.sin(x*.24+z*.35)+.004*Math.sin(x*.65)*Math.cos(z*.7)+.002*Math.sin(z*1.5+x*.3);
+  return r.p.y+strength*(crown+rut+rough);
+ }
+ const terrainAnchors=paths.flatMap(path=>path.samples.filter((_,i)=>i%12===0));
+ function terrainElevation(x,z){
+  let sum=0,weight=0;
+  for(const a of terrainAnchors){const q=(x-a.p.x)**2+(z-a.p.z)**2;if(q>18000)continue;const w=Math.exp(-q/648);sum+=a.p.y*w;weight+=w;}
+  return weight>1e-12?sum/weight:nearest(x,z).p.y;
+ }
+ function height(x,z,ground,r=nearest(x,z)){
+  if(r.distance<=5)return roadHeight(x,z,r);
+  if(r.distance>=12)return ground(x,z);
+  return T.MathUtils.lerp(roadHeight(x,z,r),ground(x,z),smooth((r.distance-5)/7));
+ }
  function surface(x,z,paved,ground){
   const r=nearest(x,z);
-  if(paved.distance<=7.5 || (paved.distance<r.distance && r.distance>14))return paved;
-  const onRoad=r.distance<7,blend=clamp((paved.distance-7.5)/10);
-  const y=onRoad?r.p.y:ground(x,z);
-  const material={type:'gravel',friction:.88+(.62-.88)*blend,rollingResistance:.022+(.045-.022)*blend,isKerbRumble:false};
-  const normal=onRoad?undefined:{x:(ground(x-.2,z)-ground(x+.2,z))/.4,y:1,z:(ground(x,z-.2)-ground(x,z+.2))/.4};
+  if(paved.distance<=7.5 || (paved.distance<r.distance && r.distance>14 && paved.distance<18))return paved;
+  const blend=smooth((paved.distance-7.5)/12),edge=smooth((r.distance-2.8)/3.2);
+  const variation=.015*Math.sin(x*.09+z*.12);
+  const material={type:'gravel',friction:T.MathUtils.lerp(.88,.66-.17*edge+variation,blend),rollingResistance:T.MathUtils.lerp(.022,.032+.043*edge,blend),looseness:blend*(.5+.5*edge),isKerbRumble:false};
+  const y=height(x,z,ground,r),e=.12;
+  const normal={x:(height(x-e,z,ground)-height(x+e,z,ground))/(2*e),y:1,z:(height(x,z-e,ground)-height(x,z+e,ground))/(2*e)};
   return {...r,p:new T.Vector3(x,y,z),normal,material};
  }
- return {paths,nearest,surface,length:paths[1].length,entrance:rallyEntrance};
+ return {paths,nearest,surface,height,roadHeight,terrainElevation,length:paths[1].length,entrance:rallyEntrance};
 }
 
-export function buildRallyVisuals(scene,route,renderer){
+export function buildRallyVisuals(scene,route,renderer,ground){
  const loader=new T.TextureLoader(),soil=new T.MeshStandardMaterial({color:0xa18a63,roughness:1,envMapIntensity:.2});
  const ready=Promise.all(['color','normal','rough'].map(kind=>loader.loadAsync('./assets/terrain/dirt-1k-'+kind+'.jpg'))).then(maps=>{
   maps.forEach((tx,i)=>{tx.wrapS=tx.wrapT=T.RepeatWrapping;tx.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());if(i===0)tx.colorSpace=T.SRGBColorSpace;});
@@ -50,10 +72,10 @@ export function buildRallyVisuals(scene,route,renderer){
  const edgeCanvas=document.createElement('canvas');edgeCanvas.width=64;edgeCanvas.height=2;const edgeContext=edgeCanvas.getContext('2d'),fade=edgeContext.createLinearGradient(0,0,64,0);fade.addColorStop(0,'black');fade.addColorStop(.25,'white');fade.addColorStop(.75,'white');fade.addColorStop(1,'black');edgeContext.fillStyle=fade;edgeContext.fillRect(0,0,64,2);
  const shoulder=new T.MeshStandardMaterial({color:0x80734f,roughness:1,vertexColors:true,alphaMap:new T.CanvasTexture(edgeCanvas),transparent:true,depthWrite:false});
  function strip(path,width,offset,material,lift,edge=false){
-  const positions=[],uv=[],colors=[],indices=[];
+  const positions=[],uv=[],colors=[],indices=[],columns=width>7?9:2;
   path.samples.forEach((a,i)=>{
-   for(const side of [-1,1]){const irregular=width>7?.24*Math.sin(i*.31+side)+.14*Math.sin(i*.83):0,p=a.p.clone().addScaledVector(a.n,offset+side*(width/2+irregular));positions.push(p.x,p.y+lift,p.z);uv.push(edge?(side+1)/2:(offset+side*width/2)/1.2,edge?.5:i*path.length/(path.samples.length-1)/1.2);const c=new T.Color().setHSL(.12,.19,.31+.045*Math.sin(i*.08));colors.push(c.r,c.g,c.b);}
-   if(i<path.samples.length-1){const j=i*2;indices.push(j,j+2,j+1,j+1,j+2,j+3);}
+   for(let col=0;col<columns;col++){const side=col/(columns-1)*2-1,irregular=width>7?.16*Math.sin(i*.12+side):0,p=a.p.clone().addScaledVector(a.n,offset+side*(width/2+irregular));positions.push(p.x,(ground?route.height(p.x,p.z,ground):route.roadHeight(p.x,p.z))+lift,p.z);uv.push(edge?(side+1)/2:(offset+side*width/2)/1.2,edge?.5:i*path.length/(path.samples.length-1)/1.2);const c=new T.Color().setHSL(.12,.19,.31+.045*Math.sin(i*.08));colors.push(c.r,c.g,c.b);}
+   if(i<path.samples.length-1)for(let col=0;col<columns-1;col++){const j=i*columns+col;indices.push(j,j+columns,j+1,j+1,j+columns,j+columns+1);}
   });
   const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(positions,3));g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));if(edge)g.setAttribute('color',new T.Float32BufferAttribute(colors,3));g.setIndex(indices);g.computeVertexNormals();const m=new T.Mesh(g,material);m.receiveShadow=true;scene.add(m);
  }
