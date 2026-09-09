@@ -18,4 +18,4 @@ export {
   getM5PhysicsMetadata,
   loadM5Visual,
   advanceLap,
-} from './m5-runtime.js?v=4';
+} from './m5-runtime.js?v=5';

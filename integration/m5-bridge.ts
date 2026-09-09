@@ -54,6 +54,10 @@ export type M5WheelTelemetry = {
   angularVelocityRadS: number;
   wheelSpeedMs: number;
   suspensionCompression: number;
+  damperVelocityMs: number;
+  damperForceN: number;
+  springForceN: number;
+  bumpStopForceN: number;
   verticalTravelM: number;
   normalLoadN: number;
   contactState: M5ContactState;
@@ -61,6 +65,7 @@ export type M5WheelTelemetry = {
   groundContactPos: M5Vec3;
   surfaceType: string;
   surfaceFriction: number;
+  surfaceLooseness: number;
   slipAngleRad: number;
   slipRatio: number;
   forceLongitudinalN: number;
@@ -363,6 +368,10 @@ function hydrate(target: M5CarState, sim: Simulation, raw: VehicleState = sim.ve
       angularVelocityRadS: finite(wheel.angularVelocity),
       wheelSpeedMs: finite(wheel.angularVelocity) * M5_CONFIG.wheelRadius,
       suspensionCompression: finite(wheel.suspensionCompression),
+      damperVelocityMs: finite(suspensionState?.velocity),
+      damperForceN: finite(suspensionState?.damperForceN),
+      springForceN: finite(suspensionState?.springForceN),
+      bumpStopForceN: finite(suspensionState?.bumpStopForceN),
       verticalTravelM: finite(wheel.verticalTravelM),
       normalLoadN: finite(wheel.forceVectorNorm),
       contactState: wheel.isAirborne ? 'airborne' : 'contact',
@@ -370,6 +379,7 @@ function hydrate(target: M5CarState, sim: Simulation, raw: VehicleState = sim.ve
       groundContactPos,
       surfaceType: String(wheel.surfaceType),
       surfaceFriction: finite(wheel.surfaceFriction),
+      surfaceLooseness: finite(endSurface.looseness),
       slipAngleRad: finite(wheel.slipAngle),
       slipRatio: finite(wheel.slipRatio),
       forceLongitudinalN: finite(wheel.forceVectorLong),

@@ -94,15 +94,15 @@ l=lap();for(const t of [.05,.26,.51,.76,.95])advanceLap(l,t,t!==.51,10);assert.e
 const gameSource=fs.readFileSync(new URL('./dist/game.js',import.meta.url),'utf8');
 const physicsSource=fs.readFileSync(new URL('./dist/physics.mjs',import.meta.url),'utf8');
 assert(gameSource.includes('car.add(steerPivot)'));assert(!gameSource.includes('body.add(steerPivot)'));assert(gameSource.includes('const chassisCgLocalY=.52-.035'));console.log('PASS wheel assemblies are decoupled from chassis roll/pitch');
-assert(physicsSource.includes("./m5-runtime.js?v=4"));console.log('PASS corrected M5 runtime cache bust is active');
+assert(physicsSource.includes("./m5-runtime.js?v=5"));console.log('PASS corrected M5 runtime cache bust is active');
 const chassisCgDeclaration=gameSource.indexOf('const chassisCgLocalY=.52-.035'),m5VisualLoad=gameSource.indexOf('try{\n const visual=await loadG90Visual()');assert(chassisCgDeclaration>=0&&m5VisualLoad>=0&&chassisCgDeclaration<m5VisualLoad);console.log('PASS chassis CG render constant remains in animation-loop scope');
 
 const indexSource=fs.readFileSync(new URL('./dist/index.html',import.meta.url),'utf8');
 const uiSource=fs.readFileSync(new URL('./dist/ui.js',import.meta.url),'utf8');
 assert(gameSource.includes('w.rotation.y=ws.steerAngleRad;'));assert(!gameSource.includes('w.rotation.y=-steer;'));assert(gameSource.includes('wheelStateById.get(w.userData.id)'));console.log('PASS M5 render steering sign and wheel identity match vehicle physics');
-assert(indexSource.includes('maximum-scale=1,user-scalable=no'));assert(indexSource.includes('./ui.js?v=7')&&indexSource.includes('./game.js?v=17'));assert(uiSource.includes("document.addEventListener('touchend'")&&uiSource.includes("{passive:false}"));console.log('PASS Mobile Safari double-tap zoom suppression and cache-busted controls');
+assert(indexSource.includes('maximum-scale=1,user-scalable=no'));assert(indexSource.includes('./ui.js?v=7')&&indexSource.includes('./game.js?v=18'));assert(uiSource.includes("document.addEventListener('touchend'")&&uiSource.includes("{passive:false}"));console.log('PASS Mobile Safari double-tap zoom suppression and cache-busted controls');
 
-assert(uiSource.includes('input.held=false;input.steer=0'));assert(uiSource.includes("'gesturestart','gesturechange','gestureend'"));assert(uiSource.includes("e.touches.length>1")&&uiSource.includes("document.addEventListener('touchmove'"));assert(indexSource.includes('./ui.js?v=7')&&indexSource.includes('./game.js?v=17'));assert(gameSource.includes("./ui.js?v=7"));console.log('PASS Mobile Safari pinch zoom suppression and synchronized UI module cache bust');
+assert(uiSource.includes('input.held=false;input.steer=0'));assert(uiSource.includes("'gesturestart','gesturechange','gestureend'"));assert(uiSource.includes("e.touches.length>1")&&uiSource.includes("document.addEventListener('touchmove'"));assert(indexSource.includes('./ui.js?v=7')&&indexSource.includes('./game.js?v=18'));assert(gameSource.includes("./ui.js?v=7"));console.log('PASS Mobile Safari pinch zoom suppression and synchronized UI module cache bust');
 
 assert(gameSource.includes("d=a.d.clone().lerp(b.d,u).normalize()"));assert(gameSource.includes("n=a.n.clone().lerp(b.n,u).normalize()"));console.log('PASS Racerrhi road tangent/normal interpolation for M5 suspension continuity');
 
@@ -135,7 +135,7 @@ assert(gameSource.includes("bonnetErrorLength>bonnetProfile.maxWorldLagM"));
 assert(gameSource.includes("bonnetProfile?bonnetProfile.targetFollowRate:6"));
 console.log('PASS bonnet camera filters heading, grade, position and look target with tight mount lag');
 
-assert(gameSource.includes('rebaseM5RenderSnapshotPose(renderState'));assert(gameSource.includes("./physics.mjs?v=4"));console.log('PASS intro and return-to-menu rebase world-space wheel hubs with staged chassis pose');
+assert(gameSource.includes('rebaseM5RenderSnapshotPose(renderState'));assert(gameSource.includes("./physics.mjs?v=5"));console.log('PASS intro and return-to-menu rebase world-space wheel hubs with staged chassis pose');
 
 const visualsSource=fs.readFileSync(new URL('./dist/visuals.js',import.meta.url),'utf8');
 const graphicsSource=fs.readFileSync(new URL('./dist/graphics.mjs',import.meta.url),'utf8');

@@ -78,6 +78,11 @@ jobs:
           node --check dist/ui.js
           node --check dist/visuals.js
           node test.mjs
+      - name: Validate complete gravel pipeline, weight transfer, AWD and feedback
+        run: |
+          npx --yes tsx@4.20.6 integration/rally-feel-regression.test.ts
+          npx --yes tsx@4.20.6 integration/rally-awd-regression.test.ts
+          node integration/rally-feedback-regression.test.mjs
       - name: Install browser smoke dependencies
         run: |
           npm install --no-package-lock --no-save playwright@1.55.0 puppeteer-core@25.10.0 pngjs@7.0.0
@@ -86,11 +91,13 @@ jobs:
         run: xvfb-run -a node integration/browser-smoke.mjs
       - name: Verify independent mobile multi-touch ownership
         run: xvfb-run -a node integration/mobile-pointer-smoke.mjs
+      - name: Verify rally driving, dust shader, touch handoff and gravel audio
+        run: xvfb-run -a node integration/rally-gameplay-browser.mjs
       - name: Check out exact pre-rally baseline for matched screenshots
         if: github.ref_name == 'astra/rally-realism'
         uses: actions/checkout@v4
         with:
-          ref: a6b99002e8eaac7b8b3d20cb20deff4bd43d2ff8
+          ref: 2b5e97a77e29bab97640676158dd5e94a8ac86c1
           path: baseline
       - name: Prepare baseline runtime and identical source textures
         if: github.ref_name == 'astra/rally-realism'
