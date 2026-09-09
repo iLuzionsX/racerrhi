@@ -199,9 +199,12 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
+          name: github-pages-${{ github.run_attempt }}
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}
       - name: Install deployed-preview browser smoke dependencies
         if: github.ref_name == 'astra/rally-realism' || github.ref_name == 'astra/next-gen-g90' || github.ref_name == 'astra/console-graphics' || github.ref_name == 'astra/slide-recovery-unwind' || github.ref_name == 'astra/progressive-speed-steering' || github.ref_name == 'astra/slide-braking-friction' || github.ref_name == 'astra/intuitive-steering-inputs'
         run: |
