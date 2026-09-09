@@ -97,6 +97,8 @@ jobs:
         run: |
           mkdir -p baseline/.vendor baseline/dist/assets/bmw-m5-g90-default
           cp -a .vendor/Racing26 baseline/.vendor/Racing26
+          git -C baseline/.vendor/Racing26 restore --worktree src/physics
+          node baseline/integration/apply-donor-patches.mjs
           npm install --no-package-lock --no-save esbuild@0.25.9 three@0.185.1 playwright@1.55.0 pngjs@7.0.0
           npx esbuild baseline/integration/m5-bridge.ts --bundle --format=esm --platform=browser --target=es2022 --external:three --define:import.meta.env.BASE_URL='"./"' --outfile=baseline/dist/m5-runtime.js
           cp .vendor/Racing26/public/assets/bmw-m5-g90-default/part-*.b64 baseline/dist/assets/bmw-m5-g90-default/
@@ -165,7 +167,7 @@ jobs:
             mkdir -p production-main/.vendor
             cp -a .vendor/Racing26 production-main/.vendor/Racing26
             # Production must use its own donor patches, not the preview's patch.
-            git -C production-main/.vendor/Racing26 restore --worktree src/physics/Suspension.ts
+            git -C production-main/.vendor/Racing26 restore --worktree src/physics
             if [ -f production-main/integration/apply-donor-patches.mjs ]; then
               node production-main/integration/apply-donor-patches.mjs
             fi
