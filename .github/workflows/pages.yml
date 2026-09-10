@@ -78,6 +78,7 @@ jobs:
           node --check dist/ui.js
           node --check dist/visuals.js
           node test.mjs
+          node integration/graphics-material-regression.test.mjs
       - name: Validate complete gravel pipeline, weight transfer, AWD and feedback
         run: |
           npx --yes tsx@4.20.6 integration/rally-feel-regression.test.ts

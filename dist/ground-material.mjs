@@ -50,6 +50,7 @@ tx=normalize(tx-normal*dot(normal,tx));vec3 tz=normalize(cross(tx,normal));
 normal=normalize(normal+tx*detail.x+tz*detail.y);
 #endif
 `).replace('#include <roughnessmap_fragment>',`
+float roughnessFactor=roughness;
 #ifdef USE_ROUGHNESSMAP
 roughnessFactor*=groundSample(roughnessMap).g;
 #endif
