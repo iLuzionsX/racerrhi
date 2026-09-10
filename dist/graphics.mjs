@@ -74,7 +74,8 @@ export function upgradeCar(model){
 }
 
 export function localReflections(renderer,scene,car,materials){
- let target,probe,last=-Infinity,high=true,captures=0;
+ let target,probe,last=-Infinity,high=true,captures=0,lastEnvironment,lastBackground;
+ const capturedAt=new T.Vector3(Infinity,Infinity,Infinity);
  const reflected=new T.Scene();reflected.background=scene.background;reflected.environment=scene.environment;
  reflected.environmentIntensity=scene.environmentIntensity;reflected.backgroundIntensity=scene.backgroundIntensity;
  reflected.add(new T.HemisphereLight('#dce9f2','#57513d',.32));
@@ -94,6 +95,7 @@ export function localReflections(renderer,scene,car,materials){
  const localTrees=forest?new T.InstancedMesh(forest.geometry,forest.material,72):null;
  if(localTrees){for(let i=0;i<forest.count;i+=3){forest.getMatrixAt(i,treeMatrix);treePositions.push({i,p:new T.Vector3().setFromMatrixPosition(treeMatrix).applyMatrix4(forest.matrixWorld)});}reflected.add(localTrees);}
  function quality(value){
+  if(target&&high===(value==='high'))return;
   high=value==='high';target?.dispose();
   target=new T.WebGLCubeRenderTarget(high?128:64,{type:T.HalfFloatType,generateMipmaps:true,minFilter:T.LinearMipmapLinearFilter});
   probe=new T.CubeCamera(.35,320,target);
@@ -102,7 +104,11 @@ export function localReflections(renderer,scene,car,materials){
  }
  quality('balanced');
  return {quality,update(time){
-  if(time-last<(high?.8:1.2))return;last=time;
+  if(time-last<(high?.8:1.2))return;
+  // World-aligned reflections of stationary scenery stay valid when only the
+  // viewing camera rotates. Avoid six identical renders at rest or in menus.
+  if(last!==-Infinity&&capturedAt.distanceToSquared(car.position)<.45**2&&lastEnvironment===scene.environment&&lastBackground===scene.background)return;
+  last=time;capturedAt.copy(car.position);lastEnvironment=scene.environment;lastBackground=scene.background;
   probe.position.copy(car.position);probe.position.y+=1.05;floor.position.copy(car.position);floor.position.y-=.03;
   const radius=high?245:165,radius2=radius*radius;
   const world=new T.Vector3();for(const {proxy,source} of proxies){source.updateMatrixWorld();proxy.matrix.copy(source.matrixWorld);if(source.isInstancedMesh){source.computeBoundingSphere();world.copy(source.boundingSphere.center).applyMatrix4(source.matrixWorld);proxy.visible=world.distanceToSquared(car.position)<(radius+source.boundingSphere.radius)**2;}else proxy.visible=source.getWorldPosition(world).distanceToSquared(car.position)<radius2;}

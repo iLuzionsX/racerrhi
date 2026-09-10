@@ -22,7 +22,8 @@ globalThis.__reviewPose=(view)=>{
  const [eye,aim]=poses[view],rotation=car.rotation.y;camera.position.copy(car.position).add(V(...eye).applyAxisAngle(V(0,1,0),rotation));camera.lookAt(car.position.clone().add(V(...aim).applyAxisAngle(V(0,1,0),rotation)));camera.fov=48;camera.updateProjectionMatrix();
  sunlight.target.position.copy(car.position);sunlight.position.copy(car.position).addScaledVector(sunDir,120);scene.updateMatrixWorld(true);reflections.update(performance.now()/1000+2);renderer.render(scene,camera);
  const widths=wheels.map(w=>{const b=new T.Box3().setFromObject(w.userData.spinPivot.children[0]);return {id:w.userData.id,width:b.max.x-b.min.x};});
- return {triangles:renderer.info.render.triangles,drawCalls:renderer.info.render.calls,drawingBuffer:[renderer.domElement.width,renderer.domElement.height],widths};
+ const image=shadow.material.map.image,ctx=image.getContext('2d'),shadowEdges=[[0,128],[127,128],[64,0],[64,255]].map(([x,y])=>ctx.getImageData(x,y,1,1).data[3]);
+ return {triangles:renderer.info.render.triangles,drawCalls:renderer.info.render.calls,drawingBuffer:[renderer.domElement.width,renderer.domElement.height],widths,shadowEdges};
 };`;
 const types={'.js':'text/javascript','.mjs':'text/javascript','.css':'text/css','.html':'text/html','.json':'application/json','.wasm':'application/wasm','.jpg':'image/jpeg','.png':'image/png'};
 const server=http.createServer((req,res)=>{
@@ -48,6 +49,7 @@ try{
    const stats=await page.evaluate(v=>globalThis.__reviewPose(v),view);
    await page.screenshot({path:'artifacts/rally-review/'+variant+'-'+view+'.png',timeout:90000});
    report.views[variant].views[view]=stats;
+   if(variant==='after'&&stats.shadowEdges.some(alpha=>alpha!==0))throw Error('Contact shadow clips at the edge of its plane');
    if(variant==='after'&&view==='rear')for(const wheel of stats.widths){const expected=wheel.id.startsWith('F')?.285:.295;if(Math.abs(wheel.width-expected)>.001)throw Error('Actual loaded wheel width is wrong: '+JSON.stringify(wheel));}
   }
   report.views[variant].frameTimes=await page.evaluate(()=>new Promise(resolve=>{let last=performance.now(),values=[];const tick=now=>{values.push(now-last);last=now;if(values.length<10)requestAnimationFrame(tick);else{values.sort((a,b)=>a-b);resolve({meanMs:values.reduce((a,b)=>a+b,0)/values.length,p95Ms:values[Math.floor(values.length*.95)],view:'dirt',samples:values.length});}};requestAnimationFrame(tick);}));

@@ -218,7 +218,8 @@ const graphics = await desktopPage.evaluate(() => globalThis.__racerrhiGraphics)
 if (graphics) {
  if (!(graphics.reflections > 1)) throw new Error('Circuit reflection probe did not update');
  await desktopPage.evaluate(() => { const q=document.getElementById('quality');q.value='high';q.dispatchEvent(new Event('change',{bubbles:true})); });
- await desktopPage.waitForFunction(before => globalThis.__racerrhiGraphics.reflections > before + 2, graphics.reflections);
+ // A tier switch must refresh the probe once. Stationary scenery is then cached.
+ await desktopPage.waitForFunction(before => globalThis.__racerrhiGraphics.reflections > before, graphics.reflections);
  await assertRenderableCanvas(desktopPage);
  await desktopPage.screenshot({path:'artifacts/graphics-high.png',timeout:90000});
  console.log('PASS animated circuit reflections and High quality rendering', graphics);

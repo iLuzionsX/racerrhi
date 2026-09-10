@@ -2,7 +2,7 @@ import {createRallyFeedback,sampleRallyFeedback} from './rally-feedback.mjs';
 import {createRallyDust,createGravelAudio} from './rally-effects.mjs';
 import {environmentPass} from './environment-pass.mjs?v=2';
 import {createRallyRoute,buildRallyVisuals,rallyEntrance} from './rally-route.mjs?v=2';
-import {upgradeCar,localReflections} from './graphics.mjs?v=4';
+import {upgradeCar,localReflections} from './graphics.mjs?v=5';
 import {loadG90Visual} from './g90-visual.mjs?v=2';
 import {nearestRoadProjection} from './road-projection.mjs';
 import {wheelVisualHubY} from './wheel-contact.mjs';
@@ -10,7 +10,7 @@ import * as T from 'three';
 import {clamp} from './controls.mjs?v=4';
 import {M5_FIXED_DT,stepCar,newCar,advanceLap,setSurfaceSampler,resolveBoundaryContact,loadM5Visual,captureM5RenderSnapshot,interpolateM5RenderSnapshots,rebaseM5RenderSnapshotPose,createM5StepScheduler,resetM5StepScheduler,pauseM5StepScheduler,consumeM5FrameTime} from './physics.mjs?v=6';
 import {config,input as touchInput,clearInput,sessionVisible} from './ui.js?v=7';
-import {surfaces,foliage,furniture,trackDetail} from './visuals.js?v=4';
+import {surfaces,foliage,furniture,trackDetail} from './visuals.js?v=5';
 import {chaseCameraProfile} from './chase-camera.mjs';
 import {bonnetCameraProfile} from './bonnet-camera.mjs';
 import {createRewardState,chooseChallenge,awardSkill,stepFlow,rollDisplayScore,formatScore,ghostDelta,formatDelta} from './reward-loop.mjs?v=1';
@@ -120,7 +120,7 @@ try{
  modelLoaded=true;
 }catch(e){$('loadtext').textContent='The BMW M5 could not load. Reload to retry.';console.error(e);throw e;}
 // Soft contact shadow anchors the downloaded car even outside the moving shadow frustum.
-const shadowCanvas=document.createElement('canvas');shadowCanvas.width=128;shadowCanvas.height=256;const sc=shadowCanvas.getContext('2d'),gradient=sc.createRadialGradient(64,128,5,64,128,108);gradient.addColorStop(0,'rgba(0,0,0,.65)');gradient.addColorStop(1,'rgba(0,0,0,0)');sc.fillStyle=gradient;sc.fillRect(0,0,128,256);const shadow=new T.Mesh(new T.PlaneGeometry(3.2,5.6),new T.MeshBasicMaterial({map:new T.CanvasTexture(shadowCanvas),transparent:true,depthWrite:false}));shadow.rotation.x=-Math.PI/2;shadow.position.y=.03;shadow.renderOrder=3;car.add(shadow);
+const shadowCanvas=document.createElement('canvas');shadowCanvas.width=128;shadowCanvas.height=256;const sc=shadowCanvas.getContext('2d');sc.scale(.5,1);const gradient=sc.createRadialGradient(128,128,5,128,128,124);gradient.addColorStop(0,'rgba(0,0,0,.65)');gradient.addColorStop(1,'rgba(0,0,0,0)');sc.fillStyle=gradient;sc.fillRect(0,0,256,256);const shadow=new T.Mesh(new T.PlaneGeometry(3.2,5.6),new T.MeshBasicMaterial({map:new T.CanvasTexture(shadowCanvas),transparent:true,depthWrite:false}));shadow.rotation.x=-Math.PI/2;shadow.position.y=.03;shadow.renderOrder=3;car.add(shadow);
 await visualReady;
 reflections=localReflections(renderer,scene,car,reflectiveMaterials);
 let state=newCar(start.p.x,start.p.z,yaw),mode='intro',paused=false,cam=0,demoT=.022,clock=0,prev=performance.now(),toastEnd=0,lap,best=0,reward=createRewardState(),challenge=null,ghostTrace=null,ghostCapture=[],lastGhostBin=0,apexSeen=new Set(),driftTracker=null,nearMissTracker=null,driftCooldown=0,nearMissCooldown=0;const physicsClock=createM5StepScheduler();let renderPrevious=captureM5RenderSnapshot(state),renderCurrent=renderPrevious;try{best=Number(localStorage.getItem('apex-best-v1'))||0;const savedGhost=JSON.parse(localStorage.getItem('apex-ghost-v1')||'null');if(Array.isArray(savedGhost)&&savedGhost.length>2)ghostTrace=savedGhost;else if(best>0)ghostTrace=[{p:0,t:0},{p:1,t:best}];}catch{}

@@ -32,17 +32,27 @@ export async function surfaces(scene,renderer,materials,sky){
   for(const promise of cache.values()){const tx=await promise;tx.anisotropy=Math.min(maxAniso,quality==='high'?16:8);tx.needsUpdate=true;}
  };
 }
+export function foliageMaterial(tex){
+ const material=new T.MeshStandardMaterial({map:tex,alphaTest:.42,side:T.DoubleSide,roughness:.96,alphaToCoverage:true});
+ // A crossed billboard represents a volume of leaves, not three vertical walls.
+ // Bias its lighting normal toward the sky while retaining directional variation.
+ material.onBeforeCompile=shader=>{shader.fragmentShader=shader.fragmentShader.replace('#include <normal_fragment_begin>','#include <normal_fragment_begin>\nnormal=normalize(normal*.65+(viewMatrix*vec4(0.,1.,0.,0.)).xyz*.76);');};
+ material.customProgramCacheKey=()=> 'canopy-volume-v1';
+ return material;
+}
 export async function foliage(scene,positions){
  const bark=new T.MeshStandardMaterial({color:0x5f5342,roughness:1});
  const trunks=new T.InstancedMesh(new T.CylinderGeometry(.09,.17,1,16),bark,positions.length),pose=new T.Object3D();
  positions.forEach((p,i)=>{pose.position.set(p.x,p.y+p.s*.55,p.z);pose.scale.set(p.s*.48,p.s*1.1,p.s*.48);pose.rotation.y=(i*.73)%Math.PI;pose.updateMatrix();trunks.setMatrixAt(i,pose.matrix);});trunks.castShadow=trunks.receiveShadow=true;scene.add(trunks);
  const tex=await new T.TextureLoader().loadAsync('./assets/terrain/stone-pine.png');tex.colorSpace=T.SRGBColorSpace;
- const material=new T.MeshStandardMaterial({map:tex,alphaTest:.42,side:T.DoubleSide,roughness:.96,alphaToCoverage:true});
+ const material=foliageMaterial(tex);
  const geo=new T.PlaneGeometry(1,1);geo.translate(0,.5,0);
  const forest=new T.InstancedMesh(geo,material,positions.length*3),dummy=new T.Object3D();
  forest.name='coastal-tree-canopies';
  positions.forEach((p,i)=>{for(let k=0;k<3;k++){const idx=i*3+k,jitter=1+Math.sin(i*12.91)*.17,width=.82+.32*(.5+.5*Math.sin(i*6.13));dummy.position.set(p.x,p.y,p.z);dummy.scale.set(p.s*2.45*jitter*width,p.s*2.65*jitter,p.s*2.45*jitter*width);dummy.rotation.y=i*2.399+k*Math.PI/3;dummy.updateMatrix();forest.setMatrixAt(idx,dummy.matrix);const tint=new T.Color().setHSL(.25+Math.sin(i*.91)*.025,.13,.62+Math.sin(i*1.71)*.065);forest.setColorAt(idx,tint);}});
- forest.castShadow=true;forest.receiveShadow=true;scene.add(forest);
+ // The source photograph already contains canopy occlusion. Receiving shadows
+ // from the other two intersecting cards triple-darkened the same foliage.
+ forest.castShadow=true;forest.receiveShadow=false;scene.add(forest);
 }
 
 export function trackDetail(scene,at,length){
