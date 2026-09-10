@@ -12,6 +12,7 @@ for(const kind of ['asphalt','soil','grass','rock']){
  assert(!shader.fragmentShader.includes('#include <map_fragment>'));
  assert(shader.fragmentShader.includes('groundSample(map)'));
  assert(shader.fragmentShader.includes('nb.xy=nb.xy*groundRotation'));
+ assert(!/\bpatch\s*=/.test(shader.fragmentShader),'patch is a reserved GLSL identifier');
 }
 for(const id of ['FL','FR','RL','RR']){
  const min=[-.184,-.368,-.366],max=[.180,.369,.366],fit=g90WheelFitment(id,min,max);

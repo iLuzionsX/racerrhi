@@ -41,7 +41,7 @@ export async function foliage(scene,positions){
  const geo=new T.PlaneGeometry(1,1);geo.translate(0,.5,0);
  const forest=new T.InstancedMesh(geo,material,positions.length*3),dummy=new T.Object3D();
  forest.name='coastal-tree-canopies';
- positions.forEach((p,i)=>{for(let k=0;k<3;k++){const idx=i*3+k,jitter=1+Math.sin(i*12.91)*.17,width=.82+.32*(.5+.5*Math.sin(i*6.13));dummy.position.set(p.x,p.y,p.z);dummy.scale.set(p.s*2.45*jitter*width,p.s*2.65*jitter,p.s*2.45*jitter*width);dummy.rotation.y=i*2.399+k*Math.PI/3;dummy.updateMatrix();forest.setMatrixAt(idx,dummy.matrix);const tint=new T.Color().setHSL(.25+Math.sin(i*.91)*.025,.19,.38+Math.sin(i*1.71)*.055);forest.setColorAt(idx,tint);}});
+ positions.forEach((p,i)=>{for(let k=0;k<3;k++){const idx=i*3+k,jitter=1+Math.sin(i*12.91)*.17,width=.82+.32*(.5+.5*Math.sin(i*6.13));dummy.position.set(p.x,p.y,p.z);dummy.scale.set(p.s*2.45*jitter*width,p.s*2.65*jitter,p.s*2.45*jitter*width);dummy.rotation.y=i*2.399+k*Math.PI/3;dummy.updateMatrix();forest.setMatrixAt(idx,dummy.matrix);const tint=new T.Color().setHSL(.25+Math.sin(i*.91)*.025,.13,.62+Math.sin(i*1.71)*.065);forest.setColorAt(idx,tint);}});
  forest.castShadow=true;forest.receiveShadow=true;scene.add(forest);
 }
 
@@ -52,7 +52,7 @@ export function trackDetail(scene,at,length){
   const inst=new T.InstancedMesh(geo,mat,count),dummy=new T.Object3D();
   for(let i=0;i<count;i++){
    const t=(i/count+random()*.012)%1,a=at(t),side=random()<.5?-1:1,offset=side*(9.1+random()*12.5);
-   dummy.position.copy(a.p).addScaledVector(a.n,offset);dummy.position.y+=.01+random()*.10;
+   dummy.position.copy(a.p).addScaledVector(a.n,offset);dummy.position.y+=(Math.abs(offset)<16.5?-.09:-.14)+.015;
    const scale=.45+random()*1.65;dummy.scale.set(scale*(.65+random()*.5),scale*.55,scale*(.75+random()*.55));dummy.rotation.set(random()*2,random()*Math.PI,random()*2);dummy.updateMatrix();inst.setMatrixAt(i,dummy.matrix);
   }
   inst.receiveShadow=true;scene.add(inst);return inst;

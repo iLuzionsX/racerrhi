@@ -138,6 +138,7 @@ const liveBuildInfo = await assertExpectedBuildInfo(desktopPage);
 if (liveBuildInfo) console.log('LIVE_BUILD_INFO ' + JSON.stringify(liveBuildInfo));
 const desktopCanvas = await assertRenderableCanvas(desktopPage);
 fs.mkdirSync('artifacts',{recursive:true});await desktopPage.screenshot({path:'artifacts/graphics-startup.png'});
+if(desktopErrors.length)throw new Error('initial rendered frame errors: '+desktopErrors.join(' | '));
 
 // Tune using real keyboard events, reload, and confirm the saved values reach
 // the live physics input rather than only changing labels in the settings UI.

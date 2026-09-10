@@ -32,7 +32,7 @@ fs.mkdirSync('artifacts/rally-review',{recursive:true});const report={renderer:'
 try{
  for(const variant of ['before','after']){
   const context=await browser.newContext({viewport:{width:960,height:540},deviceScaleFactor:1}),page=await context.newPage(),errors=[];
-  page.on('pageerror',e=>errors.push(e.message));const start=Date.now();
+  page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});const start=Date.now();
   await page.goto('http://127.0.0.1:'+server.address().port+'/'+variant+'/',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>Boolean(globalThis.__reviewPose)&&!document.getElementById('drive').disabled,null,{timeout:90000});
   const loadMs=Date.now()-start;

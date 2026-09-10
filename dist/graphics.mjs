@@ -77,7 +77,7 @@ export function localReflections(renderer,scene,car,materials){
  let target,probe,last=-Infinity,high=true,captures=0;
  const reflected=new T.Scene();reflected.background=scene.background;reflected.environment=scene.environment;
  reflected.environmentIntensity=scene.environmentIntensity;reflected.backgroundIntensity=scene.backgroundIntensity;
- reflected.add(new T.HemisphereLight('#dce9f2','#57513d',.22));
+ reflected.add(new T.HemisphereLight('#dce9f2','#57513d',.32));
  const sun=scene.userData.sunLight.clone();sun.castShadow=false;sun.position.copy(scene.userData.sunDirection).multiplyScalar(120);reflected.add(sun);
  const proxies=[];scene.updateMatrixWorld(true);
  for(const source of scene.children){

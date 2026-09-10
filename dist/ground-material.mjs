@@ -14,8 +14,8 @@ float groundBlend(){return .25+.5*groundNoise(vGroundWorld.xz*.17);}
 vec4 groundSample(sampler2D tex){vec2 p=groundUV();return mix(texture2D(tex,p),texture2D(tex,groundRotation*p*.83+vec2(13.7,5.3)),groundBlend());}
 `;
   const shade=kind==='asphalt'?`
-float wear=groundNoise(vGroundWorld.xz*.055),patch=groundNoise(vGroundWorld.xz*.22);
-diffuseColor.rgb*=.84+.20*wear+.035*patch;
+float wear=groundNoise(vGroundWorld.xz*.055),wearPatch=groundNoise(vGroundWorld.xz*.22);
+diffuseColor.rgb*=.84+.20*wear+.035*wearPatch;
 // Slightly accumulated dust near the road edges, not continuous black rails.
 float verge=smoothstep(1.08,1.49,abs(vGroundRoad.x-1.5));
 diffuseColor.rgb=mix(diffuseColor.rgb,diffuseColor.rgb*vec3(1.16,1.09,.95),verge*.34);
