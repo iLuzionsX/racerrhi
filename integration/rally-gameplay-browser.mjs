@@ -26,7 +26,7 @@ try{
  page.on('pageerror',e=>errors.push(e.message));
  page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
  await page.addInitScript(()=>{globalThis.__racerrhiDiagnostics={};localStorage.setItem('apex-controls-v2',JSON.stringify({quality:'high',show:true,sound:false}));});
- await page.route('**/game.js*',async route=>{const response=await route.fetch();await route.fulfill({response,body:"import {setCarPose as testSetCarPose} from './physics.mjs?v=5';\n"+await response.text()+hook});});
+ await page.route('**/game.js*',async route=>{const response=await route.fetch();await route.fulfill({response,body:"import {setCarPose as testSetCarPose} from './physics.mjs?v=6';\n"+await response.text()+hook});});
  await page.goto(url,{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>globalThis.__rallyGameplay&&!document.getElementById('drive').disabled,null,{timeout:90000});
  const build=process.env.RACERRHI_EXPECTED_COMMIT?await page.evaluate(async()=>await (await fetch('./build-info.json',{cache:'no-store'})).json()):{commit:'local-ci'};

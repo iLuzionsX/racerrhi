@@ -1,31 +1,31 @@
 import {createRallyFeedback,sampleRallyFeedback} from './rally-feedback.mjs';
 import {createRallyDust,createGravelAudio} from './rally-effects.mjs';
-import {environmentPass} from './environment-pass.mjs';
-import {createRallyRoute,buildRallyVisuals,rallyEntrance} from './rally-route.mjs';
-import {upgradeCar,localReflections} from './graphics.mjs?v=3';
-import {loadG90Visual} from './g90-visual.mjs?v=1';
+import {environmentPass} from './environment-pass.mjs?v=2';
+import {createRallyRoute,buildRallyVisuals,rallyEntrance} from './rally-route.mjs?v=2';
+import {upgradeCar,localReflections} from './graphics.mjs?v=4';
+import {loadG90Visual} from './g90-visual.mjs?v=2';
 import {nearestRoadProjection} from './road-projection.mjs';
 import {wheelVisualHubY} from './wheel-contact.mjs';
 import * as T from 'three';
 import {clamp} from './controls.mjs?v=4';
-import {M5_FIXED_DT,stepCar,newCar,advanceLap,setSurfaceSampler,resolveBoundaryContact,loadM5Visual,captureM5RenderSnapshot,interpolateM5RenderSnapshots,rebaseM5RenderSnapshotPose,createM5StepScheduler,resetM5StepScheduler,pauseM5StepScheduler,consumeM5FrameTime} from './physics.mjs?v=5';
+import {M5_FIXED_DT,stepCar,newCar,advanceLap,setSurfaceSampler,resolveBoundaryContact,loadM5Visual,captureM5RenderSnapshot,interpolateM5RenderSnapshots,rebaseM5RenderSnapshotPose,createM5StepScheduler,resetM5StepScheduler,pauseM5StepScheduler,consumeM5FrameTime} from './physics.mjs?v=6';
 import {config,input as touchInput,clearInput,sessionVisible} from './ui.js?v=7';
-import {surfaces,foliage,furniture,trackDetail} from './visuals.js?v=3';
+import {surfaces,foliage,furniture,trackDetail} from './visuals.js?v=4';
 import {chaseCameraProfile} from './chase-camera.mjs';
 import {bonnetCameraProfile} from './bonnet-camera.mjs';
 import {createRewardState,chooseChallenge,awardSkill,stepFlow,rollDisplayScore,formatScore,ghostDelta,formatDelta} from './reward-loop.mjs?v=1';
 const $=id=>document.getElementById(id),TAU=Math.PI*2,wrapAngle=a=>Math.atan2(Math.sin(a),Math.cos(a));
 let renderer;try{renderer=new T.WebGLRenderer({canvas:$('world'),antialias:true,powerPreference:'high-performance'});}catch(e){$('loadtext').textContent='This drive needs WebGL 2. Try a current browser with hardware acceleration enabled.';throw e;}
 const mobile=matchMedia('(pointer:coarse)').matches;
-renderer.setPixelRatio(Math.min(devicePixelRatio,mobile?1.4:1.8));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=T.SRGBColorSpace;renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;renderer.shadowMap.autoUpdate=true;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=.92;
-const scene=new T.Scene();scene.fog=new T.FogExp2('#b6bcba',.00085);const camera=new T.PerspectiveCamera(48,innerWidth/innerHeight,.15,6500);
+renderer.setPixelRatio(Math.min(devicePixelRatio,mobile?1.4:1.8));renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=T.SRGBColorSpace;renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;renderer.shadowMap.autoUpdate=true;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=.96;
+const scene=new T.Scene();scene.fog=new T.FogExp2('#b9c7d2',.00058);const camera=new T.PerspectiveCamera(48,innerWidth/innerHeight,.15,6500);
 const rallyDust=createRallyDust(scene),rallyFeedback=createRallyFeedback(),feedbackMotionAllowed=!matchMedia('(prefers-reduced-motion: reduce)').matches;let feedbackSignal=sampleRallyFeedback({speed:0,wheels:[]}),gravelAudio;
 const V=(x=0,y=0,z=0)=>new T.Vector3(x,y,z);let seed=715;const rand=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
-const sunDir=V(-.78,.35,-.60).normalize();
+const sunDir=V(-.62,.74,-.25).normalize();scene.userData.sunDirection=sunDir;
 const skyMat=new T.ShaderMaterial({side:T.BackSide,depthWrite:false,uniforms:{sun:{value:sunDir}},vertexShader:'varying vec3 pos; void main(){pos=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',fragmentShader:`varying vec3 pos;uniform vec3 sun;void main(){vec3 d=normalize(pos);float h=max(d.y,0.);vec3 c=mix(vec3(.88,.65,.40),vec3(.25,.48,.59),pow(h,.45));c=mix(vec3(.60,.66,.59),c,smoothstep(-.05,.14,d.y));float s=max(dot(d,sun),0.);c+=vec3(1.,.48,.15)*pow(s,18.)*.28;c+=vec3(4.,2.9,1.6)*smoothstep(.99965,.99985,s);gl_FragColor=vec4(c,1.);}`});
 const sky=new T.Mesh(new T.SphereGeometry(4000,32,16),skyMat);scene.add(sky);
 const envScene=new T.Scene();envScene.add(new T.Mesh(new T.SphereGeometry(500,32,16),skyMat.clone()));const pmrem=new T.PMREMGenerator(renderer);scene.environment=pmrem.fromScene(envScene,.08,.1,1000).texture;pmrem.dispose();
-scene.add(new T.HemisphereLight('#dceeff','#454a35',.48));const sunlight=new T.DirectionalLight('#fff0d7',3.1);sunlight.castShadow=true;sunlight.shadow.mapSize.set(mobile?1024:2048,mobile?1024:2048);Object.assign(sunlight.shadow.camera,{left:-55,right:55,top:55,bottom:-55,near:1,far:260});sunlight.shadow.bias=-.00012;sunlight.shadow.normalBias=.022;sunlight.shadow.radius=2;scene.add(sunlight,sunlight.target);
+scene.add(new T.HemisphereLight('#dce9f2','#57513d',.22));const sunlight=new T.DirectionalLight('#fff5e8',2.5);sunlight.castShadow=true;sunlight.shadow.mapSize.set(mobile?1024:2048,mobile?1024:2048);Object.assign(sunlight.shadow.camera,{left:-55,right:55,top:55,bottom:-55,near:1,far:260});sunlight.shadow.bias=-.00012;sunlight.shadow.normalBias=.022;sunlight.shadow.radius=2;scene.add(sunlight,sunlight.target);scene.userData.sunLight=sunlight;
 const mat=(color,roughness=.85,metalness=0)=>new T.MeshStandardMaterial({color,roughness,metalness});
 const terrainMat=mat('#6c7950'),rockMat=mat('#9b927a'),dark=mat('#243331'),concrete=mat('#b9b5a1'),metal=mat('#aeb6ad',.4,.7),white=mat('#e7e1c8'),red=mat('#b84029');
 function mesh(geo,material,x=0,y=0,z=0){const m=new T.Mesh(geo,material);m.position.set(x,y,z);m.receiveShadow=true;scene.add(m);return m;}
@@ -62,7 +62,7 @@ function ground(x,z){
  return T.MathUtils.lerp(base,ridge,influence);
 }
 const rallyVisual=buildRallyVisuals(scene,rally,renderer,ground);
-for(let i=0;i<lp.count;i++){const x=lp.getX(i),z=lp.getZ(i);lp.setY(i,ground(x,z));const c=new T.Color().setHSL(.18+rand()*.025,.16+rand()*.12,.30+rand()*.10);landColors.push(c.r,c.g,c.b);}landGeo.setAttribute('color',new T.Float32BufferAttribute(landColors,3));landGeo.computeVertexNormals();terrainMat.vertexColors=true;mesh(landGeo,terrainMat);
+for(let i=0;i<lp.count;i++){const x=lp.getX(i),z=lp.getZ(i);lp.setY(i,ground(x,z));const c=new T.Color().setHSL(.19+.015*Math.sin(x*.012)*Math.cos(z*.017),.20,.38+.045*Math.sin(x*.021+z*.008)*Math.cos(z*.019));landColors.push(c.r,c.g,c.b);}landGeo.setAttribute('color',new T.Float32BufferAttribute(landColors,3));landGeo.computeVertexNormals();terrainMat.vertexColors=true;mesh(landGeo,terrainMat);
 const waterMat=new T.ShaderMaterial({uniforms:{time:{value:0},sun:{value:sunDir},fogColor:{value:new T.Color('#b9b29a')}},vertexShader:'varying vec3 w; void main(){w=(modelMatrix*vec4(position,1.)).xyz;gl_Position=projectionMatrix*viewMatrix*vec4(w,1.);}',fragmentShader:`uniform float time;uniform vec3 sun;uniform vec3 fogColor;varying vec3 w;void main(){vec3 v=normalize(cameraPosition-w);float a=sin(w.x*.35+time*.9)+sin(w.z*.29-time*.6)+sin((w.x+w.z)*.7+time);vec3 n=normalize(vec3(cos(w.x*.35+time)*.08,1.,cos(w.z*.29-time*.6)*.06));float f=pow(1.-max(dot(n,v),0.),3.);float spec=pow(max(dot(reflect(-sun,n),v),0.),130.);vec3 c=mix(vec3(.045,.24,.27),vec3(.43,.54,.51),f)+vec3(1.,.70,.30)*spec*1.4+a*.006;c=mix(c,fogColor,1.-exp(-distance(cameraPosition,w)*.0006));gl_FragColor=vec4(c,1.);}`});const ocean=mesh(new T.PlaneGeometry(7000,7000),waterMat,-1300,-2,0);ocean.rotation.x=-Math.PI/2;
 // Tall ridgelines frame the inland horizon.
 for(let j=0;j<8;j++){const g=new T.PlaneGeometry(650,600,48,48);g.rotateX(-Math.PI/2);const ps=g.attributes.position,ridgeColors=[];for(let i=0;i<ps.count;i++){const x=ps.getX(i),z=ps.getZ(i);ps.setY(i,Math.max(0,1-Math.hypot(x/340,z/330))*230+Math.sin(x*.032)*Math.cos(z*.037)*13);const c=new T.Color().setHSL(.13+Math.sin(x*.02)*.025,.18,.30+.10*Math.sin(z*.015)**2);ridgeColors.push(c.r,c.g,c.b);}g.setAttribute('color',new T.Float32BufferAttribute(ridgeColors,3));rockMat.vertexColors=true;g.computeVertexNormals();mesh(g,rockMat,650+j%2*360,0,-1200+j*350);}
@@ -239,7 +239,7 @@ function simulate(dt){
 }
 let graphicsFrameMs=16,graphicsTuneAt=0,graphicsScale=1;
 function frame(now){requestAnimationFrame(frame);const rawDt=Math.max(0,(now-prev)/1000),dt=Math.min(rawDt,.06);prev=now;clock+=dt;graphicsFrameMs=graphicsFrameMs*.9+Math.min(rawDt*1000,1000)*.1;
-if(now-graphicsTuneAt>1500){graphicsTuneAt=now;const next=graphicsFrameMs>45?Math.max(.55,graphicsScale-.15):graphicsFrameMs<22?Math.min(1,graphicsScale+.05):graphicsScale;if(next!==graphicsScale){graphicsScale=next;const qualityDpr=config.quality==='high'?(mobile?1.5:1.65):(mobile?1.25:1.5);renderer.setPixelRatio(Math.min(devicePixelRatio,qualityDpr)*graphicsScale);}}
+if(!paused&&now-graphicsTuneAt>4000){graphicsTuneAt=now;const next=graphicsFrameMs>45?Math.max(mobile?.68:.78,graphicsScale-.06):graphicsFrameMs<22?Math.min(1,graphicsScale+.025):graphicsScale;if(next!==graphicsScale){graphicsScale=next;const qualityDpr=config.quality==='high'?(mobile?1.5:1.65):(mobile?1.25:1.5);renderer.setPixelRatio(Math.min(devicePixelRatio,qualityDpr)*graphicsScale);}}
 let renderState=renderCurrent;if(!paused){const timing=consumeM5FrameTime(physicsClock,rawDt,()=>{renderPrevious=renderCurrent;simulate(M5_FIXED_DT);renderCurrent=captureM5RenderSnapshot(state);});renderState=interpolateM5RenderSnapshots(renderPrevious,renderCurrent,timing.alpha);if(mode!=='drive'){renderState=rebaseM5RenderSnapshotPose(renderState,{x:state.x,z:state.z,y:lastRoad.p.y+chassisCgLocalY+.035,yawRad:state.heading,pitchRad:0,rollRad:0,speedMs:0});}const road=drivingSurface(renderState.x,renderState.z);car.position.set(renderState.x,renderState.y-chassisCgLocalY,renderState.z);car.rotation.y=renderState.yawRad;shadow.position.y=road.p.y+.03-car.position.y;const grade=Math.atan2(road.d.y,Math.hypot(road.d.x,road.d.z));body.rotation.x=renderState.pitchRad;body.rotation.z=clamp(renderState.rollRad,-.20,.20);wheelSpin+=renderState.speedMs*dt/.369;const wheelStateById=new Map(renderState.wheels.map(ws=>[ws.id,ws])),cy=Math.cos(renderState.yawRad),sy=Math.sin(renderState.yawRad);for(const w of wheels){const ws=wheelStateById.get(w.userData.id);if(ws){const dx=ws.hubWorldPos.x-renderState.x,dz=ws.hubWorldPos.z-renderState.z;const wheelRoad=drivingSurface(ws.hubWorldPos.x,ws.hubWorldPos.z),visualHubY=wheelVisualHubY(ws.hubWorldPos.y,wheelRoad,renderState.yawRad+ws.steerAngleRad);w.position.set(cy*dx-sy*dz,visualHubY-car.position.y,sy*dx+cy*dz);w.userData.spinPivot.rotation.x=-ws.rotationAngleRad;w.rotation.y=ws.steerAngleRad;/* identity-mapped equivalent of w.rotation.y=steer; */}else{w.userData.spinPivot.rotation.x=-wheelSpin;w.rotation.y=w.userData.front?renderState.steerAngleRad:0;}}
 feedbackSignal=rallyFeedback.update(state,dt,mode==='drive'&&countdown<=0);const dustStats=rallyDust.update(dt,feedbackSignal,state,renderer.domElement.height,mode==='drive'&&countdown<=0);globalThis.__racerrhiRallyFeedback={rolling:feedbackSignal.rolling,scrub:feedbackSignal.scrub,coverage:feedbackSignal.coverage,cameraHeaveM:feedbackMotionAllowed?feedbackSignal.cameraHeaveM:0,cameraPitchRad:feedbackMotionAllowed?feedbackSignal.cameraPitchRad:0,dust:dustStats,audioEnabled:audioOn};
 const f=V(Math.sin(renderState.yawRad),0,Math.cos(renderState.yawRad)),right=V(f.z,0,-f.x),target=car.position.clone().add(V(0,1.0,0));let desired,chaseProfile=null;

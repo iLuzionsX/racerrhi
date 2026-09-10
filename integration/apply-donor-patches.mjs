@@ -10,6 +10,7 @@ const patches = [
   fileURLToPath(new URL('./patches/racing26-deep-slide-friction.patch', import.meta.url)),
   fileURLToPath(new URL('./patches/racing26-granular-contact.patch', import.meta.url)),
   fileURLToPath(new URL('./patches/racing26-granular-kinematics.patch', import.meta.url)),
+  fileURLToPath(new URL('./patches/racing26-gravel-traction.patch', import.meta.url)),
 ];
 const git = (...args) => execFileSync('git', ['-C', donor, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 const pinned = 'abff9f452e4c2b22ac1220a1414418ace3f36e0a';

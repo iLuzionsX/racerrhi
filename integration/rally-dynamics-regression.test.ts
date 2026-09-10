@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import {TireModel} from '../.vendor/Racing26/src/physics/TireModel';
 import {PhysicsMath} from '../.vendor/Racing26/src/physics/math/PhysicsMath';
 import {newCar,setCarPose,setSurfaceSampler,stepCar,refreshCarState,M5_FIXED_DT} from './m5-bridge';
-const profiles={paved:undefined,legacyDirt:{type:'gravel',friction:.62,rollingResistance:.045,isKerbRumble:false},packed:{type:'gravel',friction:.66,rollingResistance:.032,looseness:.5,isKerbRumble:false},loose:{type:'gravel',friction:.49,rollingResistance:.075,looseness:1,isKerbRumble:false}} as const;
+import {RALLY_PACKED,RALLY_LOOSE} from '../dist/rally-material.mjs';
+const profiles={paved:undefined,legacyDirt:{type:'gravel',friction:.62,rollingResistance:.045,isKerbRumble:false},packed:RALLY_PACKED,loose:RALLY_LOOSE} as const;
 function surface(profile:keyof typeof profiles){setSurfaceSampler((x,z)=>({p:{x,y:0,z},d:{x:0,y:0,z:1},distance:0,material:profiles[profile]}));}
 surface('paved');const reference:any=newCar(0,0,0),model=new TireModel(reference._m5.vehicle.wheels[0].tireConfig);
 const forceCurves=[];

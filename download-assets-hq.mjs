@@ -13,6 +13,8 @@ for(const [id,prefix,resolution,kinds] of [
   ['dirt_aerial_02','dirt-1k','1k'],
   ['sandy_gravel_02','sand','4k',[['Diffuse','color']]],
   ['dirt_aerial_02','dirt','4k',[['Diffuse','color']]],
+  ['clean_asphalt','road-scan','2k'],
+  ['gravel_road','rally-scan','2k'],
 ]){
  const meta=JSON.parse(get('https://api.polyhaven.com/files/'+id));
  for(const [kind,suffix] of (kinds||[['Diffuse','color'],['nor_gl','normal'],['Rough','rough']])){
@@ -25,3 +27,5 @@ const hdr=JSON.parse(get('https://api.polyhaven.com/files/grasslands_sunset')).h
 writeFileSync(new URL('sunset.hdr',dir),get(hdr.url));
 writeFileSync(new URL('../RGBELoader.js',dir),get('https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/loaders/RGBELoader.js'));
 console.log('Downloaded HDR lighting and RGBE loader');
+const daylight=JSON.parse(get('https://api.polyhaven.com/files/kloofendal_48d_partly_cloudy')).hdri['1k'].hdr;
+writeFileSync(new URL('daylight.hdr',dir),get(daylight.url));

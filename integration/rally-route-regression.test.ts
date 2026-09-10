@@ -13,7 +13,7 @@ for(const path of route.paths)for(let i=0;i<path.samples.length;i++){
  maxGrade=Math.max(maxGrade,Math.abs(a.d.y)/Math.hypot(a.d.x,a.d.z));minY=Math.min(minY,a.p.y);maxY=Math.max(maxY,a.p.y);
  if(path.name==='loop')minClearance=Math.min(minClearance,paved(a.p.x,a.p.z).distance);
  if(i)maxStep=Math.max(maxStep,Math.abs(a.p.y-path.samples[i-1].p.y));
- if(paved(a.p.x,a.p.z).distance>18){const s=sample(a.p.x,a.p.z);assert.equal(s.material.type,'gravel');assert(s.material.friction<.7&&s.material.friction>.5);assert(Math.abs(s.p.y-a.p.y)<.035);}
+ if(paved(a.p.x,a.p.z).distance>18){const s=sample(a.p.x,a.p.z);assert.equal(s.material.type,'gravel');assert(s.material.friction<.75&&s.material.friction>.68);assert(Math.abs(s.p.y-a.p.y)<.035);}
 }
 assert(maxGrade<.27,'rally hill too steep');assert(maxY-minY>25);assert(minClearance>22,'rally intersects existing circuit');assert(maxStep<.55);
 // Original asphalt height and material sampling remain authoritative everywhere.

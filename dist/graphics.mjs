@@ -54,7 +54,7 @@ export function upgradeCar(model){
    const tag=((old.name||'')+' '+(o.name||'')).toLowerCase();
    let m=old;
    if(tag.includes('carpaint')||tag.includes('bodycolor')||tag.includes('body_color')){
-    m=makePhysical(old,{color:new T.Color(0x164d80),metalness:.65,roughness:.24,clearcoat:1,clearcoatRoughness:.032,envMapIntensity:1.25});
+    m=makePhysical(old,{color:new T.Color(0x153e63),metalness:.72,roughness:.29,clearcoat:1,clearcoatRoughness:.065,envMapIntensity:1.05});
    }else if(tag.includes('window')||tag.includes('glass_int')||tag.includes('windscreen')){
     m=makePhysical(old,{metalness:.10,roughness:.055,clearcoat:1,clearcoatRoughness:.025,envMapIntensity:1.1});
     m.opacity=.55;
@@ -76,8 +76,9 @@ export function upgradeCar(model){
 export function localReflections(renderer,scene,car,materials){
  let target,probe,last=-Infinity,high=true,captures=0;
  const reflected=new T.Scene();reflected.background=scene.background;reflected.environment=scene.environment;
- reflected.add(new T.HemisphereLight(0xdceeff,0x4f5c45,.8));
- const sun=new T.DirectionalLight(0xffdda1,3.4);sun.position.set(-78,35,-60);reflected.add(sun);
+ reflected.environmentIntensity=scene.environmentIntensity;reflected.backgroundIntensity=scene.backgroundIntensity;
+ reflected.add(new T.HemisphereLight('#dce9f2','#57513d',.22));
+ const sun=scene.userData.sunLight.clone();sun.castShadow=false;sun.position.copy(scene.userData.sunDirection).multiplyScalar(120);reflected.add(sun);
  const proxies=[];scene.updateMatrixWorld(true);
  for(const source of scene.children){
   if(!source.isMesh||source.material?.isShaderMaterial||source.material?.transparent||source.material?.alphaTest>0)continue;
@@ -87,6 +88,11 @@ export function localReflections(renderer,scene,car,materials){
   const proxy=source.isInstancedMesh?source.clone():new T.Mesh(source.geometry,source.material);proxy.matrixAutoUpdate=false;proxy.matrix.copy(source.matrixWorld);reflected.add(proxy);proxies.push({proxy,source});
  }
  const floor=new T.Mesh(new T.PlaneGeometry(520,520),new T.MeshStandardMaterial({color:0x555a55,roughness:.9}));floor.rotation.x=-Math.PI/2;reflected.add(floor);
+ // Reflect a bounded set of the actual nearby tree cards. The old radius filter
+ // excluded the entire instanced forest, leaving generic sky in every window.
+ const forest=scene.getObjectByName('coastal-tree-canopies'),treeMatrix=new T.Matrix4(),treeColor=new T.Color(),treePositions=[];
+ const localTrees=forest?new T.InstancedMesh(forest.geometry,forest.material,72):null;
+ if(localTrees){for(let i=0;i<forest.count;i+=3){forest.getMatrixAt(i,treeMatrix);treePositions.push({i,p:new T.Vector3().setFromMatrixPosition(treeMatrix).applyMatrix4(forest.matrixWorld)});}reflected.add(localTrees);}
  function quality(value){
   high=value==='high';target?.dispose();
   target=new T.WebGLCubeRenderTarget(high?128:64,{type:T.HalfFloatType,generateMipmaps:true,minFilter:T.LinearMipmapLinearFilter});
@@ -101,6 +107,10 @@ export function localReflections(renderer,scene,car,materials){
   const radius=high?245:165,radius2=radius*radius;
   const world=new T.Vector3();for(const {proxy,source} of proxies){source.updateMatrixWorld();proxy.matrix.copy(source.matrixWorld);if(source.isInstancedMesh){source.computeBoundingSphere();world.copy(source.boundingSphere.center).applyMatrix4(source.matrixWorld);proxy.visible=world.distanceToSquared(car.position)<(radius+source.boundingSphere.radius)**2;}else proxy.visible=source.getWorldPosition(world).distanceToSquared(car.position)<radius2;}
   reflected.background=scene.background;reflected.environment=scene.environment;
+  if(localTrees){let count=0;const near=treePositions.map(t=>({...t,d:t.p.distanceToSquared(car.position)})).filter(t=>t.d<radius2).sort((a,b)=>a.d-b.d).slice(0,high?24:12);
+   for(const tree of near)for(let k=0;k<3;k++){forest.getMatrixAt(tree.i+k,treeMatrix);treeMatrix.premultiply(forest.matrixWorld);localTrees.setMatrixAt(count,treeMatrix);forest.getColorAt(tree.i+k,treeColor);localTrees.setColorAt(count++,treeColor);}
+   localTrees.count=count;localTrees.instanceMatrix.needsUpdate=true;if(localTrees.instanceColor)localTrees.instanceColor.needsUpdate=true;localTrees.computeBoundingSphere();
+  }
   probe.update(renderer,reflected);captures++;
  },get captures(){return captures;}};
 }

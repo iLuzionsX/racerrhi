@@ -82,6 +82,7 @@ jobs:
         run: |
           npx --yes tsx@4.20.6 integration/rally-feel-regression.test.ts
           npx --yes tsx@4.20.6 integration/rally-awd-regression.test.ts
+          npx --yes tsx@4.20.6 integration/rally-grip-regression.test.ts
           node integration/rally-feedback-regression.test.mjs
       - name: Install browser smoke dependencies
         run: |
@@ -97,7 +98,7 @@ jobs:
         if: github.ref_name == 'astra/rally-realism'
         uses: actions/checkout@v4
         with:
-          ref: 2b5e97a77e29bab97640676158dd5e94a8ac86c1
+          ref: d8c1b6e95df3353d5f306bfee23e7a1cdaf38512
           path: baseline
       - name: Prepare baseline runtime and identical source textures
         if: github.ref_name == 'astra/rally-realism'

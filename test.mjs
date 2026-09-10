@@ -94,15 +94,15 @@ l=lap();for(const t of [.05,.26,.51,.76,.95])advanceLap(l,t,t!==.51,10);assert.e
 const gameSource=fs.readFileSync(new URL('./dist/game.js',import.meta.url),'utf8');
 const physicsSource=fs.readFileSync(new URL('./dist/physics.mjs',import.meta.url),'utf8');
 assert(gameSource.includes('car.add(steerPivot)'));assert(!gameSource.includes('body.add(steerPivot)'));assert(gameSource.includes('const chassisCgLocalY=.52-.035'));console.log('PASS wheel assemblies are decoupled from chassis roll/pitch');
-assert(physicsSource.includes("./m5-runtime.js?v=5"));console.log('PASS corrected M5 runtime cache bust is active');
+assert(physicsSource.includes("./m5-runtime.js?v=6"));console.log('PASS corrected M5 runtime cache bust is active');
 const chassisCgDeclaration=gameSource.indexOf('const chassisCgLocalY=.52-.035'),m5VisualLoad=gameSource.indexOf('try{\n const visual=await loadG90Visual()');assert(chassisCgDeclaration>=0&&m5VisualLoad>=0&&chassisCgDeclaration<m5VisualLoad);console.log('PASS chassis CG render constant remains in animation-loop scope');
 
 const indexSource=fs.readFileSync(new URL('./dist/index.html',import.meta.url),'utf8');
 const uiSource=fs.readFileSync(new URL('./dist/ui.js',import.meta.url),'utf8');
 assert(gameSource.includes('w.rotation.y=ws.steerAngleRad;'));assert(!gameSource.includes('w.rotation.y=-steer;'));assert(gameSource.includes('wheelStateById.get(w.userData.id)'));console.log('PASS M5 render steering sign and wheel identity match vehicle physics');
-assert(indexSource.includes('maximum-scale=1,user-scalable=no'));assert(indexSource.includes('./ui.js?v=7')&&indexSource.includes('./game.js?v=18'));assert(uiSource.includes("document.addEventListener('touchend'")&&uiSource.includes("{passive:false}"));console.log('PASS Mobile Safari double-tap zoom suppression and cache-busted controls');
+assert(indexSource.includes('maximum-scale=1,user-scalable=no'));assert(indexSource.includes('./ui.js?v=7')&&indexSource.includes('./game.js?v=19'));assert(uiSource.includes("document.addEventListener('touchend'")&&uiSource.includes("{passive:false}"));console.log('PASS Mobile Safari double-tap zoom suppression and cache-busted controls');
 
-assert(uiSource.includes('input.held=false;input.steer=0'));assert(uiSource.includes("'gesturestart','gesturechange','gestureend'"));assert(uiSource.includes("e.touches.length>1")&&uiSource.includes("document.addEventListener('touchmove'"));assert(indexSource.includes('./ui.js?v=7')&&indexSource.includes('./game.js?v=18'));assert(gameSource.includes("./ui.js?v=7"));console.log('PASS Mobile Safari pinch zoom suppression and synchronized UI module cache bust');
+assert(uiSource.includes('input.held=false;input.steer=0'));assert(uiSource.includes("'gesturestart','gesturechange','gestureend'"));assert(uiSource.includes("e.touches.length>1")&&uiSource.includes("document.addEventListener('touchmove'"));assert(indexSource.includes('./ui.js?v=7')&&indexSource.includes('./game.js?v=19'));assert(gameSource.includes("./ui.js?v=7"));console.log('PASS Mobile Safari pinch zoom suppression and synchronized UI module cache bust');
 
 assert(gameSource.includes("d=a.d.clone().lerp(b.d,u).normalize()"));assert(gameSource.includes("n=a.n.clone().lerp(b.n,u).normalize()"));console.log('PASS Racerrhi road tangent/normal interpolation for M5 suspension continuity');
 
@@ -135,19 +135,19 @@ assert(gameSource.includes("bonnetErrorLength>bonnetProfile.maxWorldLagM"));
 assert(gameSource.includes("bonnetProfile?bonnetProfile.targetFollowRate:6"));
 console.log('PASS bonnet camera filters heading, grade, position and look target with tight mount lag');
 
-assert(gameSource.includes('rebaseM5RenderSnapshotPose(renderState'));assert(gameSource.includes("./physics.mjs?v=5"));console.log('PASS intro and return-to-menu rebase world-space wheel hubs with staged chassis pose');
+assert(gameSource.includes('rebaseM5RenderSnapshotPose(renderState'));assert(gameSource.includes("./physics.mjs?v=6"));console.log('PASS intro and return-to-menu rebase world-space wheel hubs with staged chassis pose');
 
 const visualsSource=fs.readFileSync(new URL('./dist/visuals.js',import.meta.url),'utf8');
 const graphicsSource=fs.readFileSync(new URL('./dist/graphics.mjs',import.meta.url),'utf8');
 const assetSource=fs.readFileSync(new URL('./download-assets-hq.mjs',import.meta.url),'utf8');
 const hdrLoad=visualsSource.indexOf("const hdr=await new RGBELoader()"),qualityReturn=visualsSource.indexOf("return async quality=>");
 assert(hdrLoad>=0&&qualityReturn>hdrLoad,'HDR environment setup must remain reachable before the quality callback declaration');
-assert(visualsSource.includes("void (async()=>")&&visualsSource.includes("material.normalMap=maps[1]")&&visualsSource.includes("material.roughnessMap=maps[2]"));
+assert(visualsSource.includes("material.normalMap=maps[1]")&&visualsSource.includes("material.roughnessMap=maps[2]"));
 assert(assetSource.includes("'sand-1k','1k'")&&assetSource.includes("'dirt-1k','1k'")&&!assetSource.includes("'sand','2k'")&&!assetSource.includes("'dirt','2k'"));
-assert(visualsSource.includes("utilityPrefix=runoff?")&&visualsSource.includes("},6500);"));
+assert(visualsSource.includes("'road-scan'")&&visualsSource.includes("'rally-scan'")&&!visualsSource.includes("},6500);"),'do not restore expensive 4K runoff prefetch');
 assert(gameSource.includes("if(runoffQualityReady)reloadSurfaceQuality(config.quality)")&&!gameSource.includes("config.quality==='balanced')reloadSurfaceQuality"));
 assert(gameSource.includes("trackDetailQuality(config.quality)")&&gameSource.includes("},1800);")&&gameSource.includes("buildRunoff();ribbon(0,15,roadMat)"));
-assert(graphicsSource.includes("high?128:64")&&graphicsSource.includes("high?.8:1.2")&&graphicsSource.includes("clearcoatRoughness:.032"));
+assert(graphicsSource.includes("high?128:64")&&graphicsSource.includes("high?.8:1.2")&&graphicsSource.includes("clearcoatRoughness:.065"));
 assert(gameSource.includes("mobile?1.5:1.65")&&gameSource.includes("mobile?1536:2048"));
 console.log('PASS high graphics path uses HDR reflections, full PBR runoff maps, live quality switching and roadside micro-detail');
 

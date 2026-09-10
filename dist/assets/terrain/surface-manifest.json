@@ -1,0 +1,11 @@
+{
+  "license": "CC0-1.0",
+  "licenseUrl": "https://polyhaven.com/license",
+  "assets": [
+    {"id":"clean_asphalt","author":"Dimitrios Savva","url":"https://polyhaven.com/a/clean_asphalt","runtimePrefix":"road-scan","resolution":"2k","scanWidthMetres":2.1},
+    {"id":"gravel_road","author":"Amal Kumar","url":"https://polyhaven.com/a/gravel_road","runtimePrefix":"rally-scan","resolution":"2k","scanWidthMetres":2},
+    {"id":"kloofendal_48d_partly_cloudy","author":"Greg Zaal","url":"https://polyhaven.com/a/kloofendal_48d_partly_cloudy","runtimeFile":"daylight.hdr","resolution":"1k"}
+  ],
+  "processing": "Original downloads; metre-scale multi-sample shader, restrained albedo variation, dry roughness floor. No AI-generated photographic assets.",
+  "retrieved": "2026-09-10"
+}

@@ -1,0 +1,73 @@
+diff --git a/src/physics/DriverAids.ts b/src/physics/DriverAids.ts
+index 497271a..937e985 100644
+--- a/src/physics/DriverAids.ts
++++ b/src/physics/DriverAids.ts
+@@ -198,7 +198,8 @@ export class DriverAidsSystem {
+ 
+   public updateTCS(
+     drivenWheelSlipRatios: number[],
+-    dt: number
++    dt: number,
++    granularLateralDemand: number = 0
+   ): { throttleMultiplier: number; tcsActive: boolean } {
+     if (this.config.tcsMode === 'OFF') {
+       this.tcsActive = false;
+@@ -218,18 +219,19 @@ export class DriverAidsSystem {
+       ...drivenWheelSlipRatios.map((slip) => this.normalizedTravelSlip(slip))
+     );
+ 
+-    if (maxSlip > tcsThreshold) {
+-      const excess = maxSlip - tcsThreshold;
++    const soilDemand = PhysicsMath.clamp(granularLateralDemand, 0, .9);
++    if (maxSlip > tcsThreshold || soilDemand > .01) {
++      const excess = Math.max(0, maxSlip - tcsThreshold);
+       const gain = isSport
+         ? (this.config.tcsSportGain ?? 2.0)
+         : (this.config.tcsFullGain ?? 3.0);
+-      const maxReduction = isSport ? 0.72 : 0.88;
+-      const targetReduction = Math.min(maxReduction, excess * gain);
++      const maxReduction = soilDemand > .01 ? .9 : isSport ? 0.72 : 0.88;
++      const targetReduction = Math.min(maxReduction, Math.max(excess * gain, soilDemand));
+       const response = isSport
+         ? (this.config.tcsSportResponse ?? 10.0)
+         : (this.config.tcsFullResponse ?? 16.0);
+       this.tcsThrottleReduction +=
+-        (targetReduction - this.tcsThrottleReduction) * Math.min(1.0, response * dt);
++        (targetReduction - this.tcsThrottleReduction) * Math.min(1.0, Math.max(response, soilDemand > .01 ? 20 : 0) * dt);
+       this.tcsActive = true;
+     } else {
+       const recovery = isSport ? 6.5 : 5.0;
+@@ -237,7 +239,7 @@ export class DriverAidsSystem {
+       this.tcsActive = this.tcsThrottleReduction > 0.04;
+     }
+ 
+-    const minimumThrottle = isSport ? 0.26 : 0.12;
++    const minimumThrottle = soilDemand > .01 ? .10 : isSport ? 0.26 : 0.12;
+     const throttleMultiplier = Math.max(minimumThrottle, 1.0 - this.tcsThrottleReduction);
+     return { throttleMultiplier, tcsActive: this.tcsActive };
+   }
+diff --git a/src/physics/Vehicle.ts b/src/physics/Vehicle.ts
+index 4ab7638..c1b6c2e 100644
+--- a/src/physics/Vehicle.ts
++++ b/src/physics/Vehicle.ts
+@@ -491,7 +491,19 @@ export class Vehicle {
+         ? [this.wheels[2].rawSlipRatio, this.wheels[3].rawSlipRatio]
+         : this.wheels.map((w) => w.rawSlipRatio);
+ 
+-    const tcsResult = this.driverAids.updateTCS(drivenSlips, dt);
++    // On loose ground the rear contact patches can exhaust their combined-slip
++    // budget before longitudinal wheelspin crosses SPORT TCS's road threshold.
++    // Reserve shear for cornering by reducing engine demand only. Never apply a
++    // yaw impulse, change steering, or clamp chassis velocity. OFF stays OFF and
++    // an asphalt/straight-line run takes the original controller path exactly.
++    const loose = this.surfaceProvider.sampleSurface(this.rigidBody.position.x, this.rigidBody.position.z).looseness ?? 0;
++    const rearAngle = Math.max(...this.wheels.slice(2).map((w, i) =>
++      this.suspension.states[i + 2].tireNormalForceN > 100 ? Math.abs(w.relaxationSlipAngle) : 0));
++    const cornerDemand = PhysicsMath.clamp((rearAngle - .045) / .13, 0, 1);
++    const granularLateralDemand = inputs.throttle > .01
++      ? .88 * cornerDemand * cornerDemand * (3 - 2 * cornerDemand) * PhysicsMath.clamp(loose * 4, 0, 1) * PhysicsMath.clamp((speedMs - 3) / 5, 0, 1)
++      : 0;
++    const tcsResult = this.driverAids.updateTCS(drivenSlips, dt, granularLateralDemand);
+     const effectiveThrottle = inputs.throttle * tcsResult.throttleMultiplier;
+ 
+     // 5. Powertrain & Differential Torque Path

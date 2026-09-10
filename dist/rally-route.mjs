@@ -1,4 +1,6 @@
 import * as T from 'three';
+import {rallyMaterial} from './rally-material.mjs';
+import {groundMaterial} from './ground-material.mjs';
 
 const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
 const smooth=v=>{const t=clamp(v);return t*t*(3-2*t);};
@@ -55,7 +57,7 @@ export function createRallyRoute(){
   if(paved.distance<=7.5 || (paved.distance<r.distance && r.distance>14 && paved.distance<18))return paved;
   const blend=smooth((paved.distance-7.5)/12),edge=smooth((r.distance-2.8)/3.2);
   const variation=.015*Math.sin(x*.09+z*.12);
-  const material={type:'gravel',friction:T.MathUtils.lerp(.88,.66-.17*edge+variation,blend),rollingResistance:T.MathUtils.lerp(.022,.032+.043*edge,blend),looseness:blend*(.5+.5*edge),isKerbRumble:false};
+  const material=rallyMaterial(edge,blend,variation);
   const y=height(x,z,ground,r),e=.12;
   const normal={x:(height(x-e,z,ground)-height(x+e,z,ground))/(2*e),y:1,z:(height(x,z-e,ground)-height(x,z+e,ground))/(2*e)};
   return {...r,p:new T.Vector3(x,y,z),normal,material};
@@ -64,28 +66,41 @@ export function createRallyRoute(){
 }
 
 export function buildRallyVisuals(scene,route,renderer,ground){
- const loader=new T.TextureLoader(),soil=new T.MeshStandardMaterial({color:0xa18a63,roughness:1,envMapIntensity:.2});
- const ready=Promise.all(['color','normal','rough'].map(kind=>loader.loadAsync('./assets/terrain/dirt-1k-'+kind+'.jpg'))).then(maps=>{
-  maps.forEach((tx,i)=>{tx.wrapS=tx.wrapT=T.RepeatWrapping;tx.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());if(i===0)tx.colorSpace=T.SRGBColorSpace;});
-  [soil.map,soil.normalMap,soil.roughnessMap]=maps;soil.normalScale.set(.12,.12);soil.needsUpdate=true;
+ const loader=new T.TextureLoader();
+ const soil=groundMaterial(new T.MeshStandardMaterial({color:0xffffff,roughness:1,envMapIntensity:.35,transparent:true,depthWrite:false}),{kind:'soil',metres:2,feather:true});
+ const ready=Promise.all(['color','normal','rough'].map(kind=>loader.loadAsync('./assets/terrain/rally-scan-'+kind+'.jpg'))).then(maps=>{
+  maps.forEach((tx,i)=>{tx.wrapS=tx.wrapT=T.RepeatWrapping;tx.anisotropy=Math.min(12,renderer.capabilities.getMaxAnisotropy());if(i===0)tx.colorSpace=T.SRGBColorSpace;});
+  [soil.map,soil.normalMap,soil.roughnessMap]=maps;soil.normalScale.set(.22,.22);soil.needsUpdate=true;
  });
- const edgeCanvas=document.createElement('canvas');edgeCanvas.width=64;edgeCanvas.height=2;const edgeContext=edgeCanvas.getContext('2d'),fade=edgeContext.createLinearGradient(0,0,64,0);fade.addColorStop(0,'black');fade.addColorStop(.25,'white');fade.addColorStop(.75,'white');fade.addColorStop(1,'black');edgeContext.fillStyle=fade;edgeContext.fillRect(0,0,64,2);
- const shoulder=new T.MeshStandardMaterial({color:0x80734f,roughness:1,vertexColors:true,alphaMap:new T.CanvasTexture(edgeCanvas),transparent:true,depthWrite:false});
- function strip(path,width,offset,material,lift,edge=false){
-  const positions=[],uv=[],colors=[],indices=[],columns=width>7?9:2;
+ // One feathered, ground-following shoulder. Shared world UVs avoid the tiled
+ // brown-carpet look, stretched corner UVs, and seams where the access joins.
+ for(const path of route.paths){
+  const positions=[],uv=[],indices=[],columns=15;
   path.samples.forEach((a,i)=>{
-   for(let col=0;col<columns;col++){const side=col/(columns-1)*2-1,irregular=width>7?.16*Math.sin(i*.12+side):0,p=a.p.clone().addScaledVector(a.n,offset+side*(width/2+irregular));positions.push(p.x,(ground?route.height(p.x,p.z,ground):route.roadHeight(p.x,p.z))+lift,p.z);uv.push(edge?(side+1)/2:(offset+side*width/2)/1.2,edge?.5:i*path.length/(path.samples.length-1)/1.2);const c=new T.Color().setHSL(.12,.19,.31+.045*Math.sin(i*.08));colors.push(c.r,c.g,c.b);}
+   for(let col=0;col<columns;col++){
+    const offset=(col/(columns-1)*2-1)*7,p=a.p.clone().addScaledVector(a.n,offset);
+    positions.push(p.x,route.height(p.x,p.z,ground)+.026,p.z);uv.push(offset,i*path.length/(path.samples.length-1));
+   }
    if(i<path.samples.length-1)for(let col=0;col<columns-1;col++){const j=i*columns+col;indices.push(j,j+columns,j+1,j+1,j+columns,j+columns+1);}
   });
-  const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(positions,3));g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));if(edge)g.setAttribute('color',new T.Float32BufferAttribute(colors,3));g.setIndex(indices);g.computeVertexNormals();const m=new T.Mesh(g,material);m.receiveShadow=true;scene.add(m);
+  const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(positions,3));g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));g.setIndex(indices);g.computeVertexNormals();
+  const m=new T.Mesh(g,soil);m.receiveShadow=true;m.renderOrder=1;scene.add(m);
  }
- const rut=new T.MeshStandardMaterial({color:0x504936,transparent:true,opacity:.16,depthWrite:false,roughness:1});
- for(const path of route.paths){strip(path,14,0,shoulder,-.025,true);strip(path,8.5,0,soil,.025);for(const side of [-1,1])strip(path,.55,side*1.05,rut,.029);}
- const pose=new T.Object3D(),stoneMat=new T.MeshStandardMaterial({color:0x7c7766,roughness:1}),stones=new T.InstancedMesh(new T.IcosahedronGeometry(1,1),stoneMat,560),posts=new T.InstancedMesh(new T.CylinderGeometry(.065,.09,1.1,6),new T.MeshStandardMaterial({color:0xcac2a4,roughness:1}),220);
- for(let i=0;i<560;i++){const path=route.paths[1],a=path.samples[Math.floor(i/560*(path.samples.length-1))],side=i%2?1:-1;pose.position.copy(a.p).addScaledVector(a.n,side*(5.1+(Math.sin(i*83.13)*.5+.5)*4));pose.position.y+=.07;const s=.1+(Math.sin(i*3.3)*.5+.5)*.35;pose.scale.set(s*1.4,s*.65,s);pose.rotation.set(i*.3,i*2.39,i*.7);pose.updateMatrix();stones.setMatrixAt(i,pose.matrix);}
- for(let i=0;i<220;i++){const path=route.paths[1],a=path.samples[Math.floor(i/220*(path.samples.length-1))];pose.position.copy(a.p).addScaledVector(a.n,(i%2?1:-1)*6);pose.position.y+=.4;pose.scale.set(1,1,1);pose.rotation.set(0,i,0);pose.updateMatrix();posts.setMatrixAt(i,pose.matrix);}
- stones.receiveShadow=true;posts.castShadow=posts.receiveShadow=true;scene.add(stones,posts);
- // Keep scattered stones sparse, rather than a visually continuous stone border.
- for(let i=0;i<180;i++){const source=(i*173)%560,matrix=new T.Matrix4();stones.getMatrixAt(source,matrix);stones.setMatrixAt(i,matrix);}stones.count=180;
- return {ready,quality(value){stones.count=value==='high'?180:90;}};
+ const pose=new T.Object3D(),stoneMat=new T.MeshStandardMaterial({color:0x777164,roughness:1});
+ const stones=new T.InstancedMesh(new T.IcosahedronGeometry(1,1),stoneMat,180);
+ const posts=new T.InstancedMesh(new T.CylinderGeometry(.045,.055,.8,7),new T.MeshStandardMaterial({color:0x716857,roughness:1}),52);
+ for(let i=0;i<180;i++){
+  const path=route.paths[1],a=path.samples[Math.floor(((i*173)%557)/557*(path.samples.length-1))],side=i%2?1:-1;
+  pose.position.copy(a.p).addScaledVector(a.n,side*(5.3+(Math.sin(i*83.13)*.5+.5)*4));
+  const s=.035+(Math.sin(i*3.3)*.5+.5)*.12;
+  pose.position.y=route.height(pose.position.x,pose.position.z,ground)+s*.15;
+  pose.scale.set(s*1.4,s*.65,s);pose.rotation.set(i*.3,i*2.39,i*.7);pose.updateMatrix();stones.setMatrixAt(i,pose.matrix);
+  stones.setColorAt(i,new T.Color().setScalar(.72+.26*(.5+.5*Math.sin(i*7.7))));
+ }
+ for(let i=0;i<52;i++){
+  const path=route.paths[1],a=path.samples[Math.floor(i/52*(path.samples.length-1))];pose.position.copy(a.p).addScaledVector(a.n,(i%2?1:-1)*6.6);
+  pose.position.y=route.height(pose.position.x,pose.position.z,ground)+.32;pose.scale.set(1,1,1);pose.rotation.set(0,i,0);pose.updateMatrix();posts.setMatrixAt(i,pose.matrix);
+ }
+ stones.castShadow=stones.receiveShadow=true;posts.castShadow=posts.receiveShadow=true;scene.add(stones,posts);
+ return {ready,quality(value){stones.count=value==='high'?180:90;soil.map&&(soil.map.anisotropy=Math.min(value==='high'?16:8,renderer.capabilities.getMaxAnisotropy()));}};
 }

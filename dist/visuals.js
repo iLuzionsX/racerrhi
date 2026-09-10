@@ -1,43 +1,37 @@
 import * as T from 'three';
 import {RGBELoader} from './assets/RGBELoader.js';
+import {groundMaterial} from './ground-material.mjs';
 
 export async function surfaces(scene,renderer,materials,sky){
  const loader=new T.TextureLoader(),cache=new Map(),maxAniso=renderer.capabilities.getMaxAnisotropy();
- let loadedQuality='deferred';
  const load=path=>{if(!cache.has(path))cache.set(path,loader.loadAsync(path));return cache.get(path);};
- const repeatFor=name=>name==='grass'?[155,155]:name==='rock'?[7,7]:name==='dirt'?[9,9]:name==='sand'?[12,12]:[3,3];
- const apply=async(name,material,quality)=>{
-  const runoff=name==='sand'||name==='dirt',utilityPrefix=runoff?`${name}-1k`:name,colorPrefix=runoff&&quality==='high'?name:utilityPrefix;
-  // High upgrades only the albedo to 4K. Normal/roughness stay on the already
-  // decoded full-PBR utility maps so changing quality never recompiles six huge textures at once.
-  const paths=[`./assets/terrain/${colorPrefix}-color.jpg`,`./assets/terrain/${utilityPrefix}-normal.jpg`,`./assets/terrain/${utilityPrefix}-rough.jpg`];
-  const maps=await Promise.all(paths.map(load));
-  const repeat=repeatFor(name);
-  maps.forEach((tx,i)=>{tx.wrapS=tx.wrapT=T.RepeatWrapping;tx.repeat.set(...repeat);tx.anisotropy=Math.min(maxAniso,quality==='high'?16:12);if(i===0)tx.colorSpace=T.SRGBColorSpace;});
+ const apply=async(name,material)=>{
+  const prefix=name==='asphalt'?'road-scan':name==='dirt'?'rally-scan':name==='sand'?'sand-1k':name;
+  const maps=await Promise.all(['color','normal','rough'].map(kind=>load('./assets/terrain/'+prefix+'-'+kind+'.jpg')));
+  maps.forEach((tx,i)=>{tx.wrapS=tx.wrapT=T.RepeatWrapping;tx.anisotropy=Math.min(maxAniso,12);if(i===0)tx.colorSpace=T.SRGBColorSpace;});
   material.color.set('white');material.map=maps[0];material.normalMap=maps[1];material.roughnessMap=maps[2];
-  material.normalScale.setScalar(name==='asphalt'?.24:name==='grass'?1.05:name==='rock'?1.1:name==='sand'?.72:.86);
-  material.roughness=name==='asphalt'?.9:name==='sand'?.93:name==='dirt'?.97:.98;
-  material.envMapIntensity=name==='asphalt'?.32:name==='rock'?.24:.12;material.needsUpdate=true;
+  material.normalScale.setScalar(name==='asphalt'?.16:name==='grass'?.26:name==='rock'?.48:.18);
+  material.roughness=1;material.envMapIntensity=name==='asphalt'?.4:.35;
+  groundMaterial(material,{kind:name==='sand'||name==='dirt'?'soil':name,metres:name==='grass'?2:name==='rock'?3:name==='sand'?2:2.1});
  };
- // Load the core 2K scanned road/land surfaces before play starts.
- await Promise.all(Object.entries(materials).filter(([name])=>name!=='sand'&&name!=='dirt').map(([name,material])=>apply(name,material,'high')));
- // Keep startup responsive: runoff begins with authored base color, then the
- // full scanned PBR set is streamed in after the first rendered view.
- for(const name of ['sand','dirt']){const material=materials[name];material.color.set(name==='sand'?'#b6a68a':'#75684e');material.roughness=name==='sand'?.93:.97;material.needsUpdate=true;}
- void (async()=>{try{
-  const hdr=await new RGBELoader().loadAsync('./assets/terrain/sunset.hdr');
-  hdr.mapping=T.EquirectangularReflectionMapping;scene.environment=hdr;scene.environmentIntensity=.9;
-  scene.background=hdr;scene.backgroundIntensity=.78;scene.backgroundBlurriness=.035;scene.remove(sky);
- }catch(error){console.warn('HDR environment unavailable; keeping procedural sky.',error);}})();
- // Warm the two 4K runoff albedos after startup. On a normal session they are
- // decoded before the player ever visits Display settings, making High a cheap map swap.
- setTimeout(()=>{for(const name of ['sand','dirt'])void load(`./assets/terrain/${name}-color.jpg`).catch(()=>{});},6500);
+ await Promise.all(Object.entries(materials).map(([name,material])=>apply(name,material)));
+ try{
+  const hdr=await new RGBELoader().loadAsync('./assets/terrain/daylight.hdr');
+  hdr.mapping=T.EquirectangularReflectionMapping;scene.environment=hdr;scene.environmentIntensity=.55;
+  scene.background=hdr;scene.backgroundIntensity=.8;scene.backgroundBlurriness=.018;scene.remove(sky);
+  // Align the shadow-casting sun with the actual HDR sun, instead of illuminating
+  // the car from a different direction than its sky/reflections.
+  const {data,width,height}=hdr.image;let peak=-Infinity,pixel=0;
+  for(let i=0;i<width*height/2;i++){const value=data[i*4]+data[i*4+1]+data[i*4+2];if(value>peak){peak=value;pixel=i;}}
+  const azimuth=((pixel%width+.5)/width-.5)*Math.PI*2,elevation=(.5-(Math.floor(pixel/width)+.5)/height)*Math.PI;
+  scene.userData.sunDirection?.set(Math.cos(azimuth)*Math.cos(elevation),Math.sin(elevation),Math.sin(azimuth)*Math.cos(elevation));
+ }catch(error){console.warn('HDR environment unavailable; keeping procedural sky.',error);}
+ // Both tiers use the same compact surface set. No background 4K downloads and
+ // no material swaps while driving; only filtering/geometry budgets change.
  return async quality=>{
-  if(quality===loadedQuality)return;loadedQuality=quality;
-  return Promise.all(['sand','dirt'].map(name=>apply(name,materials[name],quality)));
+  for(const promise of cache.values()){const tx=await promise;tx.anisotropy=Math.min(maxAniso,quality==='high'?16:8);tx.needsUpdate=true;}
  };
 }
-
 export async function foliage(scene,positions){
  const bark=new T.MeshStandardMaterial({color:0x5f5342,roughness:1});
  const trunks=new T.InstancedMesh(new T.CylinderGeometry(.09,.17,1,16),bark,positions.length),pose=new T.Object3D();
@@ -46,7 +40,8 @@ export async function foliage(scene,positions){
  const material=new T.MeshStandardMaterial({map:tex,alphaTest:.42,side:T.DoubleSide,roughness:.96,alphaToCoverage:true});
  const geo=new T.PlaneGeometry(1,1);geo.translate(0,.5,0);
  const forest=new T.InstancedMesh(geo,material,positions.length*3),dummy=new T.Object3D();
- positions.forEach((p,i)=>{for(let k=0;k<3;k++){const idx=i*3+k,jitter=1+Math.sin(i*12.91+k*7.3)*.045;dummy.position.set(p.x,p.y,p.z);dummy.scale.set(p.s*2.45*jitter,p.s*2.65*jitter,p.s*2.45*jitter);dummy.rotation.y=i*2.399+k*Math.PI/3;dummy.updateMatrix();forest.setMatrixAt(idx,dummy.matrix);const tint=new T.Color().setHSL(.29+Math.sin(i*.91)*.012,.28,.48+Math.sin(i*1.71)*.035);forest.setColorAt(idx,tint);}});
+ forest.name='coastal-tree-canopies';
+ positions.forEach((p,i)=>{for(let k=0;k<3;k++){const idx=i*3+k,jitter=1+Math.sin(i*12.91)*.17,width=.82+.32*(.5+.5*Math.sin(i*6.13));dummy.position.set(p.x,p.y,p.z);dummy.scale.set(p.s*2.45*jitter*width,p.s*2.65*jitter,p.s*2.45*jitter*width);dummy.rotation.y=i*2.399+k*Math.PI/3;dummy.updateMatrix();forest.setMatrixAt(idx,dummy.matrix);const tint=new T.Color().setHSL(.25+Math.sin(i*.91)*.025,.19,.38+Math.sin(i*1.71)*.055);forest.setColorAt(idx,tint);}});
  forest.castShadow=true;forest.receiveShadow=true;scene.add(forest);
 }
 

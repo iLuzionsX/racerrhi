@@ -141,6 +141,50 @@ The sampled track geometry, material blending and pinned donor remain intact.
 
 ## Console graphics preview
 
+### Current fitment, dry-surface and gravel-control correction
+
+The detailed source G90 had 324–326 mm front and 363–366 mm rear visual wheel
+widths. The loader now centres and sizes the assemblies to 285 / 295 mm while
+retaining the 369 mm visual radius, physical hub positions, steering/spin hierarchy
+and stationary calipers. This removes the rear spacer-like stance without moving
+the physical track. The CI rear view measures the actual loaded meshes.
+
+The rally centre is now a compacted dry surface (friction 0.72, rolling resistance
+0.036, looseness 0.30); the soft shoulder blends toward 0.56 / 0.075 / 0.85.
+The coefficients are game calibration, not manufacturer gravel measurements.
+The fifth explicit donor patch makes enabled traction control reserve force for
+cornering when the loaded rear tyres develop lateral slip on loose surfaces.
+It cuts engine demand only: no yaw impulses, steering override, velocity clipping,
+respawning, extra tyre forces or changes to the paved-road controller. TCS OFF
+remains an opt-out. The 54-case full-throttle regression tests 50/70/90 km/h,
+three hand-wheel demands, three surfaces and old/new controller paths. Paved
+traces are exactly equal. In the 70 km/h, half-wheel packed-gravel case, peak
+sideslip falls from 38.74° to 8.98° with surface parameters held constant.
+
+The aerial cracked-earth tiling is replaced with [Amal Kumar's scanned Gravel
+Road](https://polyhaven.com/a/gravel_road), alongside [Dimitrios Savva's Clean
+Asphalt](https://polyhaven.com/a/clean_asphalt). A metre-scale material shader mixes
+fine aggregate with nonrepeating broad variation, feathered shoulders and subtle
+compacted wheel paths. Dry roughness is bounded. [Greg Zaal's Kloofendal daylight
+HDR](https://polyhaven.com/a/kloofendal_48d_partly_cloudy) supplies sky illumination;
+the shadow-casting sun is aligned to its bright sun disc. All three are
+[CC0](https://polyhaven.com/license); machine-readable attribution is included in
+`dist/assets/terrain/surface-manifest.json`.
+
+Rally stones and fewer, darker wooden route posts now sample the ground below
+each object. Tapered grass clumps replace solid polygon scrub, with coherent
+terrain coloration and greater tree size/shape variation. Reflections include a
+bounded set of the actual nearby trees. Wheel metal and paint have less brittle
+highlights. Both quality tiers share compact scanned maps; switching no longer
+streams 4K runoff images. Adaptive resolution changes in smaller, slower steps
+and pauses during paused scenes. Existing layouts, controls and donor pin remain.
+
+Matched CI views use 960×540 **drawing buffers**, High, identical car/camera poses,
+and pre-fix commit `d8c1b6e95df3353d5f306bfee23e7a1cdaf38512`; they now include rear
+fitment and a road-level dirt chase view. SwiftShader timings are software-renderer
+diagnostics, not actual phone or GPU performance. The earlier sections below
+record historical implementation steps and measurements.
+
 ### Connected hill rally route
 
 `astra/rally-realism` builds on the G90 and keyboard-handling preview. Turn left through the signed opening just beyond start/finish, before the pit garages. The access lane joins a roughly 985 m dirt loop with approximately 33 m of elevation range and an 11.4% maximum sampled grade. The main circuit geometry and pinned donor are unchanged. Going onto dirt invalidates a paved timed lap. Free Practice is recommended. Orange lines on the minimap show the access and loop.
