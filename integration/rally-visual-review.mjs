@@ -13,7 +13,12 @@ globalThis.__reviewPose=(view)=>{
  const p=nearest(-225,-191).p;car.position.set(-225,p.y+.035,-191);car.rotation.set(0,0,0);body.rotation.set(0,0,0);
  wheels.forEach(w=>{const id=w.userData.id;w.position.set(id.endsWith('L')?(id.startsWith('F')?.842:.830):(id.startsWith('F')?-.842:-.830),.334,id.startsWith('F')?1.367:-1.638);w.rotation.set(0,0,0);w.userData.spinPivot.rotation.set(0,0,0);});
  const poses={close:[[8,3,7],[0,1,0]],rear:[[3.6,1.8,-6],[0,.8,-.7]],chase:[[0,3.7,-10],[0,1,11]],trackside:[[38,20,-32],[14,2,12]],rally:[[180,230,-140],[185,15,200]],dirt:[[0,3.5,-9],[0,1,10]]};
- if(view==='dirt'){const a=rally.paths[1].samples[65];car.position.set(a.p.x,rally.roadHeight(a.p.x,a.p.z)+.035,a.p.z);car.rotation.y=Math.atan2(a.d.x,a.d.z);body.rotation.x=-Math.atan2(a.d.y,Math.hypot(a.d.x,a.d.z));}
+ if(view==='dirt'){
+  const a=rally.paths[1].samples[65];car.position.set(a.p.x,rally.roadHeight(a.p.x,a.p.z)+.035,a.p.z);car.rotation.y=Math.atan2(a.d.x,a.d.z);body.rotation.x=-Math.atan2(a.d.y,Math.hypot(a.d.x,a.d.z));
+  // Stage each wheel against its own point on the grade, not one horizontal
+  // axle plane; otherwise the review itself would create floating rear tyres.
+  for(const w of wheels){const p=w.position.clone().applyAxisAngle(V(0,1,0),car.rotation.y).add(car.position),road=drivingSurface(p.x,p.z);w.position.y=wheelVisualHubY(road.p.y+.349,road,car.rotation.y)-car.position.y;}
+ }
  const [eye,aim]=poses[view],rotation=car.rotation.y;camera.position.copy(car.position).add(V(...eye).applyAxisAngle(V(0,1,0),rotation));camera.lookAt(car.position.clone().add(V(...aim).applyAxisAngle(V(0,1,0),rotation)));camera.fov=48;camera.updateProjectionMatrix();
  sunlight.target.position.copy(car.position);sunlight.position.copy(car.position).addScaledVector(sunDir,120);scene.updateMatrixWorld(true);reflections.update(performance.now()/1000+2);renderer.render(scene,camera);
  const widths=wheels.map(w=>{const b=new T.Box3().setFromObject(w.userData.spinPivot.children[0]);return {id:w.userData.id,width:b.max.x-b.min.x};});
