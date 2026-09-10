@@ -90,8 +90,8 @@ const finiteState = (state:any) => [
   },M5_FIXED_DT);
   assert.equal(sim.digitalSteeringInput, 0, 'held touch wheel did not take precedence');
   assert(
-    sim.analogSteeringInput > 0 && sim.analogSteeringInput < digitalBeforeTouch,
-    'touch takeover did not preserve the outgoing command while slewing toward the opposite analog target',
+    sim.analogSteeringInput >= 0 && sim.analogSteeringInput < digitalBeforeTouch,
+    'touch takeover crossed center instead of first unwinding the outgoing keyboard command',
   );
   for(let i=0;i<8;i++) {
     stepCar(state,{
@@ -579,7 +579,8 @@ for(const key of ['x','y','z','heading','speed','yawRate','slip'] as const) {
   assert(game.includes('consumeM5FrameTime(physicsClock,rawDt'));
   assert(game.includes('interpolateM5RenderSnapshots(renderPrevious,renderCurrent,timing.alpha)'));
   assert(game.includes('wheelStateById.get(w.userData.id)'));
-  assert(game.includes('ws.hubWorldPos.y-car.position.y'));
+  assert(game.includes('wheelVisualHubY(ws.hubWorldPos.y,wheelRoad,renderState.yawRad+ws.steerAngleRad)'));
+  assert(game.includes('visualHubY-car.position.y'));
 }
 
 console.log(JSON.stringify({

@@ -1,7 +1,7 @@
 import { Simulation } from '../.vendor/Racing26/src/physics/Simulation';
 import { PhysicsMath } from '../.vendor/Racing26/src/physics/math/PhysicsMath';
 import type { VehicleState } from '../.vendor/Racing26/src/types';
-import { racerrhiSteeringTargetForM5 } from './m5-steering-adapter';
+import { racerrhiSteeringTargetForM5, updateRacerrhiKeyboardSteeringInput } from './m5-steering-adapter';
 import { racerrhiSurfaceMaterialForDistance } from './m5-surface-adapter';
 import { createRacerrhiM5Config, RACERRHI_M5_REFERENCE_LOADS } from './m5-config';
 
@@ -28,6 +28,8 @@ export type M5Vec3 = {
 };
 
 export type RoadSample = {
+  normal?: Partial<M5Vec3>;
+  material?: { type: 'asphalt' | 'kerb' | 'gravel'; friction: number; rollingResistance: number; looseness?: number; isKerbRumble: boolean };
   p?: Partial<M5Vec3>;
   d?: Partial<M5Vec3>;
   distance?: number;
@@ -52,6 +54,10 @@ export type M5WheelTelemetry = {
   angularVelocityRadS: number;
   wheelSpeedMs: number;
   suspensionCompression: number;
+  damperVelocityMs: number;
+  damperForceN: number;
+  springForceN: number;
+  bumpStopForceN: number;
   verticalTravelM: number;
   normalLoadN: number;
   contactState: M5ContactState;
@@ -59,6 +65,7 @@ export type M5WheelTelemetry = {
   groundContactPos: M5Vec3;
   surfaceType: string;
   surfaceFriction: number;
+  surfaceLooseness: number;
   slipAngleRad: number;
   slipRatio: number;
   forceLongitudinalN: number;
@@ -119,6 +126,8 @@ export type M5ControlInput = {
   throttle?: number;
   brake?: number;
   handbrake?: boolean;
+  keyboardResponse?: number;
+  keyboardStrength?: number;
   /** Binary keyboard/button intent. +1 is donor left, -1 donor right. */
   digitalSteerDirection?: -1 | 0 | 1;
   /** Racerrhi on-screen hand-wheel target in [-1, 1]. */
@@ -208,8 +217,13 @@ function surfaceFromRoad(x: number, z: number) {
   nz /= normalLength;
 
   const distance = finite(road.distance);
-  const material = racerrhiSurfaceMaterialForDistance(distance);
+  const material = road.material || racerrhiSurfaceMaterialForDistance(distance);
   const elevation = finite(road.p?.y);
+  if (road.normal) {
+    nx = finite(road.normal.x); ny = finite(road.normal.y, 1); nz = finite(road.normal.z);
+    const length = Math.hypot(nx, ny, nz) || 1;
+    nx /= length; ny /= length; nz /= length;
+  }
 
   return {
     elevation,
@@ -219,6 +233,7 @@ function surfaceFromRoad(x: number, z: number) {
     type: material.type,
     friction: material.friction,
     rollingResistance: material.rollingResistance,
+    looseness: Math.max(0,Math.min(1,finite(material.looseness))),
     wetness: 0,
     isKerbRumble: material.isKerbRumble,
   };
@@ -353,6 +368,10 @@ function hydrate(target: M5CarState, sim: Simulation, raw: VehicleState = sim.ve
       angularVelocityRadS: finite(wheel.angularVelocity),
       wheelSpeedMs: finite(wheel.angularVelocity) * M5_CONFIG.wheelRadius,
       suspensionCompression: finite(wheel.suspensionCompression),
+      damperVelocityMs: finite(suspensionState?.velocity),
+      damperForceN: finite(suspensionState?.damperForceN),
+      springForceN: finite(suspensionState?.springForceN),
+      bumpStopForceN: finite(suspensionState?.bumpStopForceN),
       verticalTravelM: finite(wheel.verticalTravelM),
       normalLoadN: finite(wheel.forceVectorNorm),
       contactState: wheel.isAirborne ? 'airborne' : 'contact',
@@ -360,6 +379,7 @@ function hydrate(target: M5CarState, sim: Simulation, raw: VehicleState = sim.ve
       groundContactPos,
       surfaceType: String(wheel.surfaceType),
       surfaceFriction: finite(wheel.surfaceFriction),
+      surfaceLooseness: finite(endSurface.looseness),
       slipAngleRad: finite(wheel.slipAngle),
       slipRatio: finite(wheel.slipRatio),
       forceLongitudinalN: finite(wheel.forceVectorLong),
@@ -412,14 +432,30 @@ function steeringInputsForStep(sim: Simulation, input: M5ControlInput) {
     // Seed the incoming controller from the current effective command so a touch
     // takeover preserves steering continuity, then let the donor's analog slew
     // move toward the new hand position at its normal rate.
+    const mappedTouchTarget = racerrhiSteeringTargetForM5(
+      sim,
+      finite(input.analogSteerTarget)
+    );
     if (
       Math.abs(sim.analogSteeringInput) <= 1e-7 &&
       Math.abs(sim.digitalSteeringInput) > 1e-7
     ) {
-      sim.resetAnalogSteeringInput(sim.digitalSteeringInput);
+      const outgoingDigital = sim.digitalSteeringInput;
+      sim.resetAnalogSteeringInput(outgoingDigital);
+
+      // Opposite-direction ownership changes are explicitly two-stage. On the
+      // first touch-owned fixed step, unwind the outgoing keyboard request only
+      // toward center; do not let the donor's fast analog reversal cross center
+      // in one tick just because the high-speed digital envelope is small.
+      if (
+        mappedTouchTarget !== 0 &&
+        Math.sign(mappedTouchTarget) !== Math.sign(outgoingDigital)
+      ) {
+        return { analogSteerTarget: 0 };
+      }
     }
     return {
-      analogSteerTarget: racerrhiSteeringTargetForM5(sim, finite(input.analogSteerTarget)),
+      analogSteerTarget: mappedTouchTarget,
     };
   }
 
@@ -435,11 +471,25 @@ function steeringInputsForStep(sim: Simulation, input: M5ControlInput) {
       Math.abs(sim.digitalSteeringInput) <= 1e-7 &&
       Math.abs(sim.analogSteeringInput) > 1e-7
     ) {
-      // Symmetric handoff back to keyboard. Digital steering keeps its own
-      // speed envelope and fast countersteer/reversal rates after this seed.
+      // Seed keyboard ownership from the outgoing analog command so handoff is
+      // continuous, then let Racerrhi's time-normalized key ramp take over.
       sim.resetDigitalSteeringInput(sim.analogSteeringInput);
     }
-    return { digitalSteerDirection: direction };
+
+    const nextDigital = updateRacerrhiKeyboardSteeringInput(
+      sim,
+      sim.digitalSteeringInput,
+      direction,
+      sim.fixedDt,
+      input
+    );
+    sim.resetAnalogSteeringInput(0);
+    sim.resetDigitalSteeringInput(nextDigital);
+
+    // Supply the already-integrated rack request directly. Passing
+    // digitalSteerDirection here would apply the donor's second fixed-rate slew
+    // and reintroduce the high-speed "instant limit" problem.
+    return { steer: nextDigital };
   }
 
   if (Number.isFinite(input.analogSteerTarget)) {

@@ -1,27 +1,45 @@
 import { Simulation } from '../.vendor/Racing26/src/physics/Simulation';
 import { PhysicsMath } from '../.vendor/Racing26/src/physics/math/PhysicsMath';
-import { digitalCountersteerRecoveryBlend } from '../.vendor/Racing26/src/physics/DigitalSteeringInput';
+import {
+  digitalCountersteerRecoveryBlend,
+  digitalSteeringLimitForSpeed,
+  digitalSteeringTarget,
+} from '../.vendor/Racing26/src/physics/DigitalSteeringInput';
 
-// Racerrhi's on-screen wheel is deliberately compact: +/-135 deg from center.
-// Racing26's M5 mobile steering is calibrated around 900 deg lock-to-lock
-// (+/-450 deg). The adapter converts Racerrhi hand travel into the M5 rack scale.
-export const RACERRHI_HAND_WHEEL_ONE_WAY_DEG = 135;
-export const M5_HAND_WHEEL_ONE_WAY_DEG = 450;
-export const ROAD_SPEED_HAND_TO_RACK_SCALE =
-  RACERRHI_HAND_WHEEL_ONE_WAY_DEG / M5_HAND_WHEEL_ONE_WAY_DEG;
-
-function smoothstep01(value: number): number {
-  const t = PhysicsMath.clamp(value, 0, 1);
-  return t * t * (3 - 2 * t);
+/**
+ * Touch steering is a hand-position control, so the same thumb position must
+ * always mean the same requested rack position. Keep the mapping fixed across
+ * speed, braking, throttle, yaw and sideslip.
+ *
+ * The fixed curve has no deadzone and keeps the center deliberately gentle:
+ *   0.30 x + 0.70 x^4.5   (applied to magnitude, then sign restored)
+ * Around 30% hand input it stays close to the proven road-speed response, while
+ * the last part of thumb travel opens progressively to full mechanical rack for
+ * parking, tight corners and deliberate countersteer.
+ */
+export function racerrhiFixedTouchCurve(value: number): number {
+  const raw = PhysicsMath.clamp(Number(value) || 0, -1, 1);
+  const magnitude = Math.abs(raw);
+  const shaped =
+    0.30 * magnitude +
+    0.70 * magnitude ** 4.5;
+  return Math.sign(raw) * shaped;
 }
 
-export function racerrhiSteeringTargetForM5(sim: Simulation, racerrhiSteer: number): number {
-  const raw = PhysicsMath.clamp(Number(racerrhiSteer) || 0, -1, 1);
-  if (Math.abs(raw) < 1e-9) return 0;
-
+export function racerrhiSteeringTargetForM5(
+  _sim: Simulation,
+  racerrhiSteer: number
+): number {
   // Racerrhi input sign is opposite Racing26's canonical +left convention.
-  const physicalDirectionTarget = -raw;
+  return PhysicsMath.clamp(-racerrhiFixedTouchCurve(racerrhiSteer), -1, 1);
+}
 
+export type KeyboardTuning = { keyboardResponse?: number; keyboardStrength?: number };
+function tuningValue(value: number | undefined, min: number, max: number) {
+  return PhysicsMath.clamp(Number.isFinite(value) ? Number(value) : 1, min, max);
+}
+
+function steeringContext(sim: Simulation, tuning: KeyboardTuning = {}) {
   const localVelocity = sim.vehicle.rigidBody.getLocalVelocity();
   const localAngularVelocity = sim.vehicle.rigidBody.getLocalAngularVelocity();
   const speedMs = Math.hypot(localVelocity.x, localVelocity.z);
@@ -30,34 +48,117 @@ export function racerrhiSteeringTargetForM5(sim: Simulation, racerrhiSteer: numb
       ? Math.atan2(localVelocity.x, Math.max(0.5, Math.abs(localVelocity.z)))
       : 0;
 
-  // Preserve the proven parking/corner-entry mapping and recovery calibration.
-  const speedKmh = speedMs * 3.6;
-  const roadSpeedBlend = smoothstep01((speedMs - 9) / 10);
-  let scale = PhysicsMath.lerp(1.0, ROAD_SPEED_HAND_TO_RACK_SCALE, roadSpeedBlend);
-  // Above 100 km/h continue reducing sensitivity instead of holding the same
-  // ratio all the way to top speed. Zero endpoint slopes avoid a gain step.
-  const highSpeedBlend = smoothstep01((speedKmh - 100) / 120);
-  scale = PhysicsMath.lerp(scale, 0.12, highSpeedBlend);
+  return {
+    speedMs,
+    localVelocity,
+    context: {
+      wheelbaseM: sim.vehicle.config.wheelbase,
+      maxSteerAngleRad: sim.vehicle.config.maxSteerAngle,
+      yawRateRadS: localAngularVelocity.y,
+      sideslipRad,
+      forwardSpeedMs: localVelocity.z,
+      targetLateralAccelerationG: 0.88 * tuningValue(tuning.keyboardStrength, 0.75, 1.25),
+    },
+  };
+}
 
-  // Severe opposite-lock recovery may temporarily unlock more rack authority.
-  const direction = Math.sign(physicalDirectionTarget) as -1 | 1;
-  const recoveryBlend = digitalCountersteerRecoveryBlend(direction, speedMs, {
-    wheelbaseM: sim.vehicle.config.wheelbase,
-    maxSteerAngleRad: sim.vehicle.config.maxSteerAngle,
-    yawRateRadS: localAngularVelocity.y,
-    sideslipRad,
-    forwardSpeedMs: localVelocity.z,
-  });
-  scale = PhysicsMath.lerp(scale, 1.0, recoveryBlend);
+export function racerrhiKeyboardTargetForM5(
+  sim: Simulation,
+  direction: -1 | 0 | 1,
+  tuning: KeyboardTuning = {}
+): number {
+  const { speedMs, context } = steeringContext(sim, tuning);
+  return digitalSteeringTarget(direction, speedMs, context);
+}
 
-  // A mild cubic curve gives small hand corrections more resolution without a
-  // deadzone or sacrificing endpoint lock. Fade it out for opposite-lock catches;
-  // retain the donor's existing slew/release timing and ownership handoff.
-  const precisionBlend = 0.25 * highSpeedBlend * (1 - recoveryBlend);
-  const shapedTarget = PhysicsMath.lerp(
-    physicalDirectionTarget,
-    physicalDirectionTarget ** 3,
-    precisionBlend
+function moveToward(current: number, target: number, maxStep: number): number {
+  const error = target - current;
+  if (Math.abs(error) <= maxStep) return target;
+  return PhysicsMath.clamp(current + Math.sign(error) * maxStep, -1, 1);
+}
+
+/**
+ * Keyboard steering is a time-based driver request, not an instant rack target.
+ *
+ * The donor already computes a useful speed-dependent *amplitude* limit. Its
+ * stock fixed rack-units-per-second slew, however, reaches a tiny high-speed
+ * limit almost immediately. Racerrhi instead scales normal wind-on rate to the
+ * current target magnitude so the time needed to reach the requested cornering
+ * limit stays approximately constant at every road speed.
+ *
+ * Release and the unwind half of a reversal are intentionally quicker. Genuine
+ * slide-recovery authority from the donor is retained, but it is still ramped
+ * rather than injected as a gain jump.
+ */
+export function updateRacerrhiKeyboardSteeringInput(
+  sim: Simulation,
+  currentInput: number,
+  direction: -1 | 0 | 1,
+  dt: number,
+  tuning: KeyboardTuning = {}
+): number {
+  const current = PhysicsMath.clamp(Number(currentInput) || 0, -1, 1);
+  if (!(dt > 0)) return current;
+
+  const { speedMs, context } = steeringContext(sim, tuning);
+  // Preserve the validated catch timing when steering against an existing slide.
+  const correctingSlide = direction * context.yawRateRadS < 0
+    && direction * context.sideslipRad > 0;
+  const ordinaryWindTime = (correctingSlide ? 0.58 : 0.38) / tuningValue(tuning.keyboardResponse, 0.70, 1.80);
+  const target = digitalSteeringTarget(direction, speedMs, context);
+  const ordinaryLimit = digitalSteeringLimitForSpeed(speedMs, context);
+  // Ordinary release takes ~100ms across speeds. Large recovery lock retains
+  // the proven rapid unwind rather than trapping the driver in countersteer.
+  const unwindRate = Math.abs(current) > ordinaryLimit * 1.05 || Math.abs(context.sideslipRad) > 0.02
+    ? 6.0 : ordinaryLimit / 0.10;
+  const recoveryBlend = digitalCountersteerRecoveryBlend(
+    direction,
+    speedMs,
+    context
   );
-  return PhysicsMath.clamp(shapedTarget * scale, -1, 1);
+
+  if (Math.abs(target - current) <= 1e-12) return target;
+
+  const reversing =
+    direction !== 0 &&
+    Math.sign(current) !== 0 &&
+    Math.sign(target) !== Math.sign(current);
+
+  // Reversal is explicitly two-stage: unwind first, then build the opposite
+  // request. This prevents one fast slew step from blasting through center.
+  if (reversing) {
+    const timeToCenter = Math.abs(current) / unwindRate;
+    if (dt <= timeToCenter) {
+      return moveToward(current, 0, unwindRate * dt);
+    }
+
+    const remainingDt = dt - timeToCenter;
+    const recoveryUrgency = Math.sqrt(PhysicsMath.clamp(recoveryBlend, 0, 1));
+    const windTime = PhysicsMath.lerp(ordinaryWindTime, 0.12, recoveryUrgency);
+    const windRate = Math.abs(target) / Math.max(0.05, windTime);
+    return moveToward(0, target, windRate * remainingDt);
+  }
+
+  if (direction === 0) {
+    // Finite release without a speed-dependent one-step snap to center.
+    return moveToward(current, 0, unwindRate * dt);
+  }
+
+  // If acceleration or another state change lowers the useful envelope while a
+  // key is held, trim toward the new target promptly but continuously.
+  if (
+    Math.sign(current) === Math.sign(target) &&
+    Math.abs(current) > Math.abs(target)
+  ) {
+    return moveToward(current, target, 4.0 * dt);
+  }
+
+  // Normal wind-on takes ~0.38 s from center to the current ordinary limit,
+  // independent of whether that limit is 100% rack at parking speed or only a
+  // few percent at 200 km/h. Severe recovery smoothly shortens that to 0.12 s,
+  // close to the donor's full-recovery slew, without a target or rate jump.
+  const recoveryUrgency = Math.sqrt(PhysicsMath.clamp(recoveryBlend, 0, 1));
+  const windTime = PhysicsMath.lerp(ordinaryWindTime, 0.12, recoveryUrgency);
+  const windRate = Math.abs(target) / Math.max(0.05, windTime);
+  return moveToward(current, target, windRate * dt);
 }

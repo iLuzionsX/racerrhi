@@ -1,0 +1,22 @@
+--- a/src/physics/SuspensionKinematicsAdapter.ts
++++ b/src/physics/SuspensionKinematicsAdapter.ts
+@@ -112,7 +112,8 @@
+         surfaceFriction: number,
+         rollingResistance: number,
+         dt: number,
+-        reflectedDrivelineInertia: number = 0
++        reflectedDrivelineInertia: number = 0,
++        surfaceLooseness: number = 0
+       ) => {
+         // Vehicle writes the Ackermann/rear-steer command immediately before the
+         // suspension solve. Treat that scalar as rack intent; the geometry solver
+@@ -149,7 +150,8 @@
+           surfaceFriction,
+           rollingResistance,
+           dt,
+-          reflectedDrivelineInertia
++          reflectedDrivelineInertia,
++          surfaceLooseness
+         );
+ 
+         // Vehicle has already cached sin/cos for commandedSteer before calling us.
