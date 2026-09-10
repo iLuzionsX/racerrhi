@@ -82,7 +82,9 @@ async function assertRenderableCanvas(page) {
 
   // Adaptive resolution can change canvas backing dimensions while it renders.
   // Capture its visible bounds without an element-stability wait.
-  const pngBuffer = await page.screenshot({ clip: box });
+  // SwiftShader's high-quality image readback can exceed Playwright's default
+  // 30 s; this is a rendering verification deadline, not a device FPS benchmark.
+  const pngBuffer = await page.screenshot({ clip: box, timeout: 90000 });
   const png = PNG.sync.read(pngBuffer);
   let sum = 0;
   let sumSq = 0;
@@ -211,14 +213,14 @@ const desktopCanvasAfterExit = await assertRenderableCanvas(desktopPage);
 // Retain a full-size rendered review image of the actual car/tyre placement.
 await desktopPage.setViewportSize({width:1280,height:720});
 fs.mkdirSync('artifacts',{recursive:true});
-await desktopPage.screenshot({path:'artifacts/handling-preview.png'});
+await desktopPage.screenshot({path:'artifacts/handling-preview.png',timeout:90000});
 const graphics = await desktopPage.evaluate(() => globalThis.__racerrhiGraphics);
 if (graphics) {
  if (!(graphics.reflections > 1)) throw new Error('Circuit reflection probe did not update');
  await desktopPage.evaluate(() => { const q=document.getElementById('quality');q.value='high';q.dispatchEvent(new Event('change',{bubbles:true})); });
  await desktopPage.waitForFunction(before => globalThis.__racerrhiGraphics.reflections > before + 2, graphics.reflections);
  await assertRenderableCanvas(desktopPage);
- await desktopPage.screenshot({path:'artifacts/graphics-high.png'});
+ await desktopPage.screenshot({path:'artifacts/graphics-high.png',timeout:90000});
  console.log('PASS animated circuit reflections and High quality rendering', graphics);
 }
 

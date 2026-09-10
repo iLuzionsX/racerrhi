@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {MeshStandardMaterial,ShaderLib} from 'three';
 import {groundMaterial} from '../dist/ground-material.mjs';
 import {g90WheelFitment} from '../dist/g90-fitment.mjs';
@@ -21,4 +22,13 @@ for(const id of ['FL','FR','RL','RR']){
  assert(Math.abs(Math.max(hi[1]-lo[1],hi[2]-lo[2])-.738)<1e-12);
  assert(lo.every((v,i)=>Math.abs(v+hi[i])<1e-12),'wheel is not centred on its hub');
 }
-console.log('PASS dry physical material shader contract and G90 assembly fitment');
+const game=fs.readFileSync(new URL('../dist/game.js',import.meta.url),'utf8');
+const qualitySource=game.slice(game.indexOf('function quality()'),game.indexOf("addEventListener('apex:command'"));
+assert(game.indexOf('let graphicsFrameMs=')<game.indexOf('function quality()'),'adaptive state must exist before startup quality()');
+for(const mobile of [false,true])for(const value of ['balanced','high'])for(const scale of [1,.78,.68]){
+ let dpr=0;const noop=()=>{},scope={mobile,config:{quality:value},graphicsScale:scale,devicePixelRatio:2,renderer:{setPixelRatio:n=>dpr=n},sunlight:{shadow:{mapSize:{setScalar:noop},map:null}},rallyDust:{quality:noop},environmentQuality:noop,rallyVisual:{quality:noop},reflections:null,trackDetailQuality:noop,runoffQualityReady:false};
+ new Function(...Object.keys(scope),qualitySource+';quality();')(...Object.values(scope));
+ const target=value==='high'?(mobile?1.5:1.65):(mobile?1.25:1.5);
+ assert.equal(dpr,target*scale,'settings lost the current adaptive resolution cap');
+}
+console.log('PASS dry physical material shader, G90 fitment and quality-switch resolution contracts');
